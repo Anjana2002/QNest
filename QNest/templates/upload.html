@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Exam Question Paper</title>
+    <script>
+        function addSection() {
+            let sectionDiv = document.createElement("div");
+            sectionDiv.innerHTML = `
+                <label>Section Name:</label>
+                <input type="text" name="section_name[]" required><br>
+
+                <label>Number of Questions:</label>
+                <input type="number" name="num_questions[]" required><br>
+
+                <label>Marks per Question:</label>
+                <input type="number" name="marks_per_question[]" required><br>
+
+                <label>Instructions:</label>
+                <input type="text" name="instructions[]" required><br><br>
+            `;
+            document.getElementById("sections-container").appendChild(sectionDiv);
+        }
+
+        function generateQuestions() {
+            let formData = new FormData(document.getElementById("upload-form"));
+
+            fetch("/upload/", {  // Ensure the correct URL
+                method: "POST",
+                body: formData,
+                headers: {
+                    "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Network response was not ok");
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    document.getElementById("question-paper").textContent = data.question_paper;
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("An error occurred while generating the question paper.");
+            });
+        }
+
+        function toggleTemplateForm() {
+            let form = document.getElementById("new-template-form");
+            form.style.display = form.style.display === "none" ? "block" : "none";
+        }
+    </script>
+</head>
+<body>
+    <h2>Select or Create Exam Template</h2>
+
+    <!-- Select Existing Template -->
+    <form id="upload-form" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <label>Select a Template:</label>
+        <select name="template_id" required>
+            {% for template in templates %}
+                <option value="{{ template.id }}">{{ template.template_name }}</option>
+            {% endfor %}
+        </select>
+        
+        <button type="button" onclick="toggleTemplateForm()">Create New Template</button>
+
+        <br><br>
+
+        <!-- File Upload Section -->
+        <h2>Upload Study Material and Previous Question Paper</h2>
+        <label for="study_material">Study Material PDF:</label>
+        <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple><br><br>
+
+        <label for="previous_question">Previous Question Paper PDF:</label>
+        <input type="file" id="previous_question" name="previous_question" accept="application/pdf" required multiple><br><br>
+
+        <button type="button" onclick="generateQuestions()">Generate Question Paper</button>
+    </form>
+
+    <!-- New Template Form (Hidden by Default) -->
+    <div id="new-template-form" style="display:none;">
+        <h2>Create New Template</h2>
+        <form method="POST">
+            {% csrf_token %}
+
+            <label>Template Name:</label>
+            <input type="text" name="template_name" required><br>
+
+            <label>Reg. No:</label>
+            <input type="text" name="reg_no"><br>
+
+            <label>Student Name:</label>
+            <input type="text" name="student_name"><br>
+
+            <label>Exam Title:</label>
+            <input type="text" name="exam_title" required><br>
+
+            <label>Course Code:</label>
+            <input type="text" name="course_code" required><br>
+
+            <label>Course Name:</label>
+            <input type="text" name="course_name" required><br>
+
+            <label>Time Duration:</label>
+            <input type="text" name="time_duration" required><br>
+
+            <label>Max Marks:</label>
+            <input type="number" name="max_marks" required><br>
+
+            <h3>Sections</h3>
+            <div id="sections-container"></div>
+            <button type="button" onclick="addSection()">Add Section</button><br><br>
+
+            <button type="submit">Save Template</button>
+        </form>
+    </div>
+
+    <!-- Generated Question Paper -->
+    <h2>Generated Question Paper:</h2>
+    <pre id="question-paper"></pre>
+
+</body>
+</html>

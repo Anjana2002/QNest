@@ -1,0 +1,29 @@
+1111111111111111111111111~ llm IIU 1111111111111 K21l0021  Reg. No. : ..... 'Y.~~_1g).~2l.t ........ ..  Name : ...... J.t~.b: .. J.-.J!-.. ......... .  I Semester Integrated M.Sc. Degree (Reg./Supple./lmp .)  Examination, October 2021  (2020 Admission Onwards)  COMPUTER SCIENCE 1801 ICSC : Introduction to C Programming  Time : 3 Hours  PART-A  Answer all the questions. Each carries 1 mark.
+
+✓ 1. What are the properties of an algorithm ? (From Program Development Cycle - Analysis/Deﬁne the problem)
+.,,, 2. What are keywords ? Give examples. (From Learning C programming language)
+.,, 3. What is a flowchart ? (From Chapter 1.3 - Flowchart)
+.,,. 4. What is the purpose of creating an algorithm before coding? (From Program Development Cycle - Algorithm development)
+.,.. 5. What is a processing symbol in a flowchart? (From Chapter 1.3.1 - Flowchart Symbols)
+
+PART-B (Short Questions)
+
+Answer all the questions briefly. Each carries 1 mark.
+
+6. Mention four flow chart symbols and their uses.
+7. What is the difference between a terminal symbol and an input/output symbol in a flowchart?
+8. Explain how a decision symbol works in a flowchart.
+9. What are the guidelines for preparing a flowchart? (From Chapter 1.3.2 - Guidelines for preparing flowcharts)
+10. What is the importance of testing an algorithm before coding? (From Program Development Cycle - Test algorithm for accuracy)
+
+PART-C (Long Questions)
+
+Answer all the questions in detail. Each carries 5 marks.
+
+11. Discuss the program development cycle with examples.
+12. Draw a flowchart for the following algorithm:
+   Input: Number of students, Marks of each student (out of 100).
+   Process: Find the average marks of all students and determine if any student has scored more than the average.
+   Output: Display the average marks and the names of students who have scored more than the average.
+
+Note: The question paper should be checked for grammatical errors, clarity, and adherence to the rules provided.
