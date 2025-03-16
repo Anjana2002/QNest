@@ -69,75 +69,135 @@ def extract_text_from_pdf(pdf):
 
 
 @login_required
+@csrf_protect
 def upload_files(request):
-    """Handle question paper generation"""
+    """Handle template creation and question paper generation."""
     if request.method == "POST":
-        template_id = request.POST.get("template_id")
+        print("Received POST request:", request.POST)  # Debugging
 
-        # Validate template
-        try:
-            template = Template.objects.get(id=template_id, user=request.user)
-        except Template.DoesNotExist:
-            return JsonResponse({"error": "Invalid template selected."}, status=400)
+        # ✅ Handle Template Creation
+        if "create_template" in request.POST:
+            try:
+                sections = {}
+                section_names = request.POST.getlist("section_name[]")
+                num_questions = request.POST.getlist("num_questions[]")
+                marks_per_question = request.POST.getlist("marks_per_question[]")
+                instructions = request.POST.getlist("instructions[]")
 
-        # Extract study material (Mandatory)
-        study_materials = request.FILES.getlist("study_material")
-        if not study_materials:
-            return JsonResponse({"error": "Study material is required."}, status=400)
+                for i in range(len(section_names)):
+                    sections[section_names[i]] = {
+                        "questions": int(num_questions[i]),
+                        "marks_per_question": int(marks_per_question[i]),
+                        "instructions": instructions[i]
+                    }
 
-        study_texts = [extract_text_from_pdf(pdf) for pdf in study_materials]
-        study_text = "\n\n".join(study_texts)
+                # Save template
+                template = Template.objects.create(
+                    user=request.user,
+                    template_name=request.POST["template_name"],
+                    exam_title=request.POST["exam_title"],
+                    course_code=request.POST["course_code"],
+                    course_name=request.POST["course_name"],
+                    time_duration=request.POST["time_duration"],
+                    max_marks=request.POST["max_marks"],
+                    sections=sections
+                )
 
-        # Extract previous question paper (Optional)
-        prev_texts = [extract_text_from_pdf(pdf) for pdf in request.FILES.getlist("previous_question", [])]
-        prev_text = "\n\n".join(prev_texts) if prev_texts else ""
+                messages.success(request, "Template saved successfully!")
+                return redirect("upload_files")  # Refresh page to show new template
 
-        # Format sections
-        sections_formatted = "\n".join([
-            f"**{section}**\n- Questions: {details['questions']}\n- Marks per Question: {details['marks_per_question']}\n- Instructions: {details['instructions']}"
-            for section, details in template.sections.items()
-        ])
+            except Exception as e:
+                return JsonResponse({"error": f"Error saving template: {str(e)}"}, status=500)
 
-        # Construct prompt for Ollama
-        prev_qstn_text = f"### **Previous Exam Paper (Use for Reference, But Do NOT Repeat Questions):**\n{prev_text[:4000]}" if prev_text else ""
-        prompt = f"""
-        You are an expert in university-level question paper creation.
-        **Strictly follow the given template** to structure the question paper.
+        # ✅ Handle Question Paper Generation
+        elif "generate_question_paper" in request.POST:
+            print("Generating question paper...")  # Debugging
 
-        ### **Generated Question Paper Format (Follow This Exactly):**
-        **Name:** ________________  
-        **Reg No:** ________________  
-        **{template.exam_title}**  
-        **Course Code:** {template.course_code}  
-        **Course Name:** {template.course_name}  
-        **Time Duration:** {template.time_duration}  
-        **Max Marks:** {template.max_marks}  
+            template_id = request.POST.get("template_id")
 
-        ### **Sections (Use These Exactly):**
-        {sections_formatted}
+            # Validate template selection
+            try:
+                template = Template.objects.get(id=template_id, user=request.user)
+            except Template.DoesNotExist:
+                return JsonResponse({"error": "Invalid template selected."}, status=400)
 
-        {prev_qstn_text}
+            # Extract study material (Mandatory)
+            study_materials = request.FILES.getlist("study_material")
+            if not study_materials:
+                return JsonResponse({"error": "Study material is required."}, status=400)
 
-        ### **Study Material (Use to Generate Questions):**  
-        {study_text[:4000]}
+            study_texts = [extract_text_from_pdf(pdf) for pdf in study_materials]
+            study_text = "\n\n".join(study_texts)
 
-        🔹 **Rules:**  
-        1. Follow the exact template structure.  
-        2. Use the previous exam paper as a reference (if provided), but don't repeat questions.  
-        3. Ensure university-level difficulty.  
-        4. Maintain proper formatting.
+            if not study_text.strip():
+                return JsonResponse({"error": "Study material text extraction failed."}, status=400)
 
-        **Generate Question Paper:**  
-        """
+            # Extract previous question paper (Optional)
+            prev_texts = [extract_text_from_pdf(pdf) for pdf in request.FILES.getlist("previous_question", [])]
+            prev_text = "\n\n".join(prev_texts) if prev_texts else ""
 
-        # Call the AI model
-        response = ollama.chat(model="mistral", messages=[{"role": "user", "content": prompt}])
-        questions = response["message"]["content"]
+            # ✅ Construct the prompt
+            prev_qstn_text = f"### **Previous Exam Paper (Use as Reference, Do NOT Repeat Questions):**\n{prev_text[:4000]}" if prev_text else ""
 
-        if not questions.strip():
-            return JsonResponse({"error": "Question generation failed. No response from the model."}, status=500)
+            # **Format template sections strictly**
+            sections_formatted = "\n".join([
+                f"**{section}**\n- Questions: {details['questions']}\n- Marks per Question: {details['marks_per_question']}\n- Instructions: {details['instructions']}\n"
+                for section, details in template.sections.items()
+            ])
 
-        return JsonResponse({"question_paper": questions})
+            # 🔹 **Final Prompt**
+            prompt = f"""
+            You are an expert in university-level question paper creation.
+            **Strictly follow the provided template** to structure the question paper.
+            Do **NOT** create any new structure. Do **NOT** modify the number of sections, numbering, or total marks.
 
+            ### **Question Paper Format (Follow This Exactly):**
+            **Name:** ________________  
+            **Reg No:** ________________  
+
+            **{template.exam_title}**  
+            **Course Code:** {template.course_code}  
+            **Course Name:** {template.course_name}  
+            **Time Duration:** {template.time_duration}  
+            **Max Marks:** {template.max_marks}  
+
+            ### **Sections (Follow These Exactly)**  
+            {sections_formatted}
+
+            {prev_qstn_text}
+
+            ### **Study Material (Use to Generate New Questions, No Copy-Pasting):**  
+            {study_text[:4000]}
+
+            🔹 **Rules for Generation:**  
+            1. **Follow the exact structure of the template.** Keep the same **number of sections, questions, and marks per question.**  
+            2. **Use the previous exam paper as a reference (if provided), but DO NOT repeat questions.**  
+            3. **Do NOT modify the question numbering, section names, or formatting.**  
+            4. **Ensure difficulty is appropriate for university-level exams.**
+
+            **Generate the Final Question Paper Below (Follow Formatting Exactly):**
+            """
+
+            print("Sending prompt to Ollama...")  # Debugging
+
+            try:
+                response = ollama.chat(model="mistral", messages=[{"role": "user", "content": prompt}])
+                print("Ollama Response:", response)  # Debugging
+
+                if "message" not in response or "content" not in response["message"]:
+                    return JsonResponse({"error": "Invalid response from the model."}, status=500)
+
+                questions = response["message"]["content"].strip()
+                if not questions:
+                    return JsonResponse({"error": "Question generation failed. No response from the model."}, status=500)
+
+                print("Generated questions:", questions)  # Debugging
+                return JsonResponse({"question_paper": questions})
+
+            except Exception as e:
+                print("Error calling Ollama:", str(e))  # Debugging
+                return JsonResponse({"error": f"Ollama request failed: {str(e)}"}, status=500)
+
+    # ✅ Retrieve existing templates and pass them to the template
     templates = Template.objects.filter(user=request.user)
     return render(request, "upload.html", {"templates": templates})
