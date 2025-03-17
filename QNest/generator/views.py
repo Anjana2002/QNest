@@ -66,48 +66,77 @@ def extract_text_from_pdf(pdf):
     text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
     return text
 
+def create_template(request):
+    """Handles template creation and saves it to the database."""
+    
+    if request.method =="GET":
+        return render(request, "create_template.html")
+
+    if request.method == "POST":
+        try:
+            template_name = request.POST.get("template_name", "").strip()
+            exam_title = request.POST.get("exam_title", "").strip()
+            course_code = request.POST.get("course_code", "").strip()
+            course_name = request.POST.get("course_name", "").strip()
+            time_duration = request.POST.get("time_duration", "").strip()
+            max_marks = request.POST.get("max_marks", "0").strip()
+
+            # Ensure required fields are present
+            if not template_name or not exam_title or not course_code or not course_name or not time_duration:
+                return JsonResponse({"error": "All fields are required"}, status=400)
+
+            # Convert max_marks safely
+            try:
+                max_marks = int(max_marks)
+            except ValueError:
+                return JsonResponse({"error": "Invalid max marks value"}, status=400)
+
+            # Extract sections
+            sections = []
+            section_names = request.POST.getlist("section_name[]")
+            num_questions = request.POST.getlist("num_questions[]")
+            marks_per_question = request.POST.getlist("marks_per_question[]")
+            instructions = request.POST.getlist("instructions[]")
+
+            for i in range(len(section_names)):
+                sections.append({
+                    "section_name": section_names[i].strip(),
+                    "questions": int(num_questions[i]),
+                    "marks_per_question": int(marks_per_question[i]),
+                    "instructions": instructions[i].strip()
+                })
+
+            # Save template to DB
+            template = Template.objects.create(
+                user=request.user,
+                template_name=template_name,
+                exam_title=exam_title,
+                course_code=course_code,
+                course_name=course_name,
+                time_duration=time_duration,
+                max_marks=max_marks,
+                sections=sections
+            )
+
+            messages.success(request, "Template saved successfully!")
+            return redirect("upload_files")  
+
+        except Exception as e:
+            return JsonResponse({"error": f"Error saving template: {str(e)}"}, status=500)
+
+    return JsonResponse({"error": "Invalid request method."}, status=400)
 
 
 @login_required
 @csrf_protect
 def upload_files(request):
-    """Handle template creation and question paper generation."""
+    """Handles template selection and question paper generation."""
     if request.method == "POST":
         print("Received POST request:", request.POST)  # Debugging
 
-        # ✅ Handle Template Creation
+        # ✅ Call `save_template` if template creation is requested
         if "create_template" in request.POST:
-            try:
-                sections = {}
-                section_names = request.POST.getlist("section_name[]")
-                num_questions = request.POST.getlist("num_questions[]")
-                marks_per_question = request.POST.getlist("marks_per_question[]")
-                instructions = request.POST.getlist("instructions[]")
-
-                for i in range(len(section_names)):
-                    sections[section_names[i]] = {
-                        "questions": int(num_questions[i]),
-                        "marks_per_question": int(marks_per_question[i]),
-                        "instructions": instructions[i]
-                    }
-
-                # Save template
-                template = Template.objects.create(
-                    user=request.user,
-                    template_name=request.POST["template_name"],
-                    exam_title=request.POST["exam_title"],
-                    course_code=request.POST["course_code"],
-                    course_name=request.POST["course_name"],
-                    time_duration=request.POST["time_duration"],
-                    max_marks=request.POST["max_marks"],
-                    sections=sections
-                )
-
-                messages.success(request, "Template saved successfully!")
-                return redirect("upload_files")  # Refresh page to show new template
-
-            except Exception as e:
-                return JsonResponse({"error": f"Error saving template: {str(e)}"}, status=500)
+            return create_template(request)
 
         # ✅ Handle Question Paper Generation
         elif "generate_question_paper" in request.POST:
@@ -199,5 +228,7 @@ def upload_files(request):
                 return JsonResponse({"error": f"Ollama request failed: {str(e)}"}, status=500)
 
     # ✅ Retrieve existing templates and pass them to the template
-    templates = Template.objects.filter(user=request.user)
+    templates = Template.objects.filter(user=request.user).order_by("id")  # Ensure correct order
+    print("Templates in DB:", list(Template.objects.filter(user=request.user)))  # Debug all templates
+    print("Templates Passed to Template:", list(templates)) 
     return render(request, "upload.html", {"templates": templates})
