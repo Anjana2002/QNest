@@ -66,6 +66,8 @@ def extract_text_from_pdf(pdf):
     text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
     return text
 
+@login_required
+@csrf_protect
 def create_template(request):
     """Handles template creation and saves it to the database."""
     
@@ -130,11 +132,9 @@ def create_template(request):
 @login_required
 @csrf_protect
 def upload_files(request):
-    """Handles template selection and question paper generation."""
     if request.method == "POST":
-        print("Received POST request:", request.POST)  # Debugging
+        print("Received POST request:", request.POST)  
 
-        # ✅ Call `save_template` if template creation is requested
         if "create_template" in request.POST:
             return create_template(request)
 
@@ -170,9 +170,10 @@ def upload_files(request):
 
             # **Format template sections strictly**
             sections_formatted = "\n".join([
-                f"**{section}**\n- Questions: {details['questions']}\n- Marks per Question: {details['marks_per_question']}\n- Instructions: {details['instructions']}\n"
-                for section, details in template.sections.items()
+                f"**{section['section_name']}**\n- Questions: {section['questions']}\n- Marks per Question: {section['marks_per_question']}\n- Instructions: {section['instructions']}\n"
+                for section in template.sections 
             ])
+
 
             # 🔹 **Final Prompt**
             prompt = f"""
@@ -227,8 +228,8 @@ def upload_files(request):
                 print("Error calling Ollama:", str(e))  # Debugging
                 return JsonResponse({"error": f"Ollama request failed: {str(e)}"}, status=500)
 
-    # ✅ Retrieve existing templates and pass them to the template
-    templates = Template.objects.filter(user=request.user).order_by("id")  # Ensure correct order
-    print("Templates in DB:", list(Template.objects.filter(user=request.user)))  # Debug all templates
+  
+    templates = Template.objects.filter(user=request.user).order_by("id") 
+    print("Templates in DB:", list(Template.objects.filter(user=request.user)))  
     print("Templates Passed to Template:", list(templates)) 
     return render(request, "upload.html", {"templates": templates})
