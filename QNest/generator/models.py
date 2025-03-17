@@ -14,7 +14,7 @@ class PreviousQuestionPaper(models.Model):
 
 class Template(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    template_name = models.CharField(max_length=255)  # Template Name
+    template_name = models.CharField(max_length=255)  
     exam_title = models.CharField(max_length=255)  # Exam Title
     course_code = models.CharField(max_length=50)  # Course Code
     course_name = models.CharField(max_length=255)  # Course Name
