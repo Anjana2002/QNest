@@ -135,15 +135,12 @@ def upload_files(request):
     if request.method == "POST":
         print("Received POST request:", request.POST)  
 
-        if "create_template" in request.POST:
-            return create_template(request)
-
         # ✅ Handle Question Paper Generation
-        elif "generate_question_paper" in request.POST:
+        if "generate_question_paper" in request.POST:
             print("Generating question paper...")  # Debugging
 
             template_id = request.POST.get("template_id")
-
+            
             # Validate template selection
             try:
                 template = Template.objects.get(id=template_id, user=request.user)
@@ -170,45 +167,71 @@ def upload_files(request):
 
             # **Format template sections strictly**
             sections_formatted = "\n".join([
-                f"**{section['section_name']}**\n- Questions: {section['questions']}\n- Marks per Question: {section['marks_per_question']}\n- Instructions: {section['instructions']}\n"
-                for section in template.sections 
+                f"### Section: {section['section_name']}\n"
+                f"Number of Questions: {section['questions']}\n"
+                f"Marks per Question: {section['marks_per_question']}\n"
+                f"Instructions: {section['instructions']}\n"
+                for section in template.sections
             ])
+
 
 
             # 🔹 **Final Prompt**
             prompt = f"""
-            You are an expert in university-level question paper creation.
-            **Strictly follow the provided template** to structure the question paper.
-            Do **NOT** create any new structure. Do **NOT** modify the number of sections, numbering, or total marks.
+                        You are an expert in university-level question paper creation.
+                        Your task is to generate a question paper **STRICTLY following the given template.**
+                        You MUST maintain the same **number of sections, question count per section, and marks distribution.**
 
-            ### **Question Paper Format (Follow This Exactly):**
-            **Name:** ________________  
-            **Reg No:** ________________  
+                         ### **DO NOT:**
+                        - Do NOT modify the number of sections or their order.
+                        - Do NOT add or remove questions.
+                        - Do NOT change the marks distribution.
+                        - Do NOT repeat questions from the previous exam paper.
 
-            **{template.exam_title}**  
-            **Course Code:** {template.course_code}  
-            **Course Name:** {template.course_name}  
-            **Time Duration:** {template.time_duration}  
-            **Max Marks:** {template.max_marks}  
+                        ---
+                        ### **Question Paper Format (Follow This Exactly)**
+                        **Name:** ________________  
+                        **Reg No:** ________________  
 
-            ### **Sections (Follow These Exactly)**  
-            {sections_formatted}
+                        **{template.exam_title}**  
+                        **Course Code:** {template.course_code}  
+                        **Course Name:** {template.course_name}  
+                        **Time Duration:** {template.time_duration}  
+                        **Max Marks:** {template.max_marks}  
 
-            {prev_qstn_text}
+                        ---
 
-            ### **Study Material (Use to Generate New Questions, No Copy-Pasting):**  
-            {study_text[:4000]}
+                        ### **Sections (Follow These EXACTLY)**  
+                        {sections_formatted}
 
-            🔹 **Rules for Generation:**  
-            1. **Follow the exact structure of the template.** Keep the same **number of sections, questions, and marks per question.**  
-            2. **Use the previous exam paper as a reference (if provided), but DO NOT repeat questions.**  
-            3. **Do NOT modify the question numbering, section names, or formatting.**  
-            4. **Ensure difficulty is appropriate for university-level exams.**
+                        {prev_qstn_text}
 
-            **Generate the Final Question Paper Below (Follow Formatting Exactly):**
-            """
+                        ---
+
+                        ### **Study Material (Use to Generate New Questions, NO Copy-Pasting):**  
+                        {study_text[:4000]}
+
+                        ---
+                        🔹 **Rules for Generation:**  
+                        1. **Strictly follow the provided template** (same sections, number of questions, marks).  
+                        2. **Use the previous exam paper as a reference (if provided), but DO NOT repeat questions.**  
+                        3. **Do NOT modify the question numbering, section names, or formatting.**  
+                        4. **Ensure difficulty is appropriate for university-level exams.**  
+
+                        **Generate the Final Question Paper Below (Follow Formatting Exactly):**
+                        """
 
             print("Sending prompt to Ollama...")  # Debugging
+            print("Template Details:")
+            print(f"Exam Title: {template.exam_title}")
+            print(f"Course Code: {template.course_code}")
+            print(f"Course Name: {template.course_name}")
+            print(f"Time Duration: {template.time_duration}")
+            print(f"Max Marks: {template.max_marks}")
+            print(f"Sections: {template.sections}")  # Make sure sections are properly retrieved
+
+            print("Final Prompt Sent to Ollama:")
+            print(prompt)
 
             try:
                 response = ollama.chat(model="mistral", messages=[{"role": "user", "content": prompt}])
@@ -232,4 +255,4 @@ def upload_files(request):
     templates = Template.objects.filter(user=request.user).order_by("id") 
     print("Templates in DB:", list(Template.objects.filter(user=request.user)))  
     print("Templates Passed to Template:", list(templates)) 
-    return render(request, "upload.html", {"templates": templates})
+    return render(request, "upload.html", {"templates": templates}) 
