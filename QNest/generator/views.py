@@ -234,7 +234,7 @@ def upload_files(request):
             print(prompt)
 
             try:
-                response = ollama.chat(model="mistral", messages=[{"role": "user", "content": prompt}])
+                response = ollama.chat(model="phi3", messages=[{"role": "user", "content": prompt}])
                 print("Ollama Response:", response)  # Debugging
 
                 if "message" not in response or "content" not in response["message"]:
