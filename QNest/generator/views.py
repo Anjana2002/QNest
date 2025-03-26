@@ -8,11 +8,8 @@ from django.views.decorators.csrf import csrf_protect
 from .models import StudyMaterial, PreviousQuestionPaper, Template
 from PyPDF2 import PdfReader
 import ollama
-import json
-from io import BytesIO
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.utils import simpleSplit
+from django.contrib import messages
+
 
 def home(request):
     """Login Page"""
@@ -226,21 +223,26 @@ def upload_files(request):
             try:
                 response = ollama.chat(model="mistral", messages=[{"role": "user", "content": prompt}])
 
-                print("Ollama Response:", response)  # Debugging
-
                 if "message" not in response or "content" not in response["message"]:
-                    return JsonResponse({"error": "Invalid response from the model."}, status=500)
+                    messages.error(request, "Invalid response from the model.")
+                    return redirect('upload')
 
                 questions = response["message"]["content"].strip()
                 if not questions:
-                    return JsonResponse({"error": "Question generation failed. No response from the model."}, status=500)
+                    messages.error(request, "Question generation failed. No response from the model.")
+                    return redirect('upload')
 
-                print("Generated questions:", questions)  # Debugging
-                return JsonResponse({"question_paper": questions})
+                messages.success(request, "Question paper generated successfully!")
+                return render(request, "upload.html", {
+                    "templates": Template.objects.filter(user=request.user).order_by("id"),
+                    "generated_questions": questions,
+                    "template_id": template_id
+                })
 
             except Exception as e:
-                print("Error calling Ollama:", str(e))  # Debugging
-                return JsonResponse({"error": f"Ollama request failed: {str(e)}"}, status=500)
+                print("Error calling Ollama:", str(e))
+                messages.error(request, f"Ollama request failed: {str(e)}")
+                return redirect('upload')
 
   
     templates = Template.objects.filter(user=request.user).order_by("id") 
