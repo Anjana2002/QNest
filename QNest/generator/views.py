@@ -204,7 +204,7 @@ def upload_files(request):
                         ### **Sections (Follow These EXACTLY)**  
                         {sections_formatted}
 
-                        {prev_qstn_text}
+                       
 
                         ---
 
@@ -212,7 +212,7 @@ def upload_files(request):
                         {study_text[:4000]}
 
                         ---
-                        🔹 **Rules for Generation:**  
+                         **Rules for Generation:**  
                         1. **Strictly follow the provided template** (same sections, number of questions, marks).  
                         2. **Use the previous exam paper as a reference (if provided), but DO NOT repeat questions.**  
                         3. **Do NOT modify the question numbering, section names, or formatting.**  
@@ -221,20 +221,11 @@ def upload_files(request):
                         **Generate the Final Question Paper Below (Follow Formatting Exactly):**
                         """
 
-            print("Sending prompt to Ollama...")  # Debugging
-            print("Template Details:")
-            print(f"Exam Title: {template.exam_title}")
-            print(f"Course Code: {template.course_code}")
-            print(f"Course Name: {template.course_name}")
-            print(f"Time Duration: {template.time_duration}")
-            print(f"Max Marks: {template.max_marks}")
-            print(f"Sections: {template.sections}")  # Make sure sections are properly retrieved
-
-            print("Final Prompt Sent to Ollama:")
             print(prompt)
 
             try:
-                response = ollama.chat(model="phi3", messages=[{"role": "user", "content": prompt}])
+                response = ollama.chat(model="mistral", messages=[{"role": "user", "content": prompt}])
+
                 print("Ollama Response:", response)  # Debugging
 
                 if "message" not in response or "content" not in response["message"]:
