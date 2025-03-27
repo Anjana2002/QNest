@@ -4,45 +4,79 @@
 
 {% block content %}
 
-    <h2>Select Exam Template & Upload Study Materials</h2>
+<h2>Select Exam Template & Upload Study Materials</h2>
 
- 
-    <form id="upload-form" method="POST" enctype="multipart/form-data">
-        {% csrf_token %}
+<form id="upload-form" method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
 
-        
-        <label>Select a Template:</label>
-        <select name="template_id" required>
-            {% if templates %}
-                {% for template in templates %}
-                    <option value="{{ template.id }}">{{ template.template_name }}</option>
-                {% endfor %}
-            {% else %}
-                <option value="" disabled>No templates available</option>
-            {% endif %}
-        </select>
+    <label>Select a Template:</label>
+    <select name="template_id" required>
+        {% if templates %}
+            {% for template in templates %}
+                <option value="{{ template.id }}">{{ template.template_name }}</option>
+            {% endfor %}
+        {% else %}
+            <option value="" disabled>No templates available</option>
+        {% endif %}
+    </select>
 
-        <br><br>
+    <br><br>
 
-        <h2>Upload Study Material and Previous Question Paper</h2>
-        <label for="study_material">Study Material PDF:</label>
-        <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple><br><br>
+    <h2>Upload Study Material and Previous Question Paper</h2>
+    <label for="study_material">Study Material PDF:</label>
+    <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple><br><br>
 
-        <label for="previous_question">Previous Question Paper PDF:</label>
-        <input type="file" id="previous_question" name="previous_question" accept="application/pdf" required multiple><br><br>
+    <label for="previous_question">Previous Question Paper PDF:</label>
+    <input type="file" id="previous_question" name="previous_question" accept="application/pdf" multiple><br><br>
 
-        <button type="submit" name="generate_question_paper">Generate Question Paper</button>
+    <button type="submit" name="generate_question_paper">Generate Question Paper</button>
+</form>
 
-        
-    </form>
-    {% if messages %}
+{% if messages %}
     {% for message in messages %}
         <p style="color: red;">{{ message }}</p>
-        {% endfor %}
-    {% endif %}
+    {% endfor %}
+{% endif %}
 
-    {% if generated_questions %}
-        <h2>Generated Question Paper</h2>
+<!-- Display Generated Questions -->
+{% if generated_questions %}
+    <h2>Generated Question Paper</h2>
+    
+    <div id="question-paper" style="padding: 20px; border: 1px solid #ccc; background-color: #f9f9f9;">
         <pre>{{ generated_questions }}</pre>
-    {% endif %}
+    </div>
+
+    <!-- Print and Download Options -->
+    <button type="button" onclick="printQuestionPaper()">Print</button>
+    <button type="button" onclick="downloadAsPDF()">Download as PDF</button>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        // Print Only the Question Paper
+        function printQuestionPaper() {
+            const questionContent = document.getElementById("question-paper").innerHTML;
+            const printWindow = window.open('', '', 'height=600,width=800');
+            printWindow.document.write('<html><head><title>Print Question Paper</title></head><body>');
+            printWindow.document.write('<h2>Generated Question Paper</h2>');
+            printWindow.document.write('<pre>' + questionContent + '</pre>');
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        // Download the Question Paper as PDF using jsPDF
+        async function downloadAsPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const questionText = document.getElementById("question-paper").innerText;
+            
+            const lines = doc.splitTextToSize(questionText, 180);
+            doc.setFontSize(12);
+            doc.text(lines, 10, 10);
+
+            doc.save("Generated_Question_Paper.pdf");
+        }
+    </script>
+{% endif %}
+
 {% endblock %}
