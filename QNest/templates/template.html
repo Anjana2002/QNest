@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Templates{% endblock %}
+
+{% block content %}
+    <h2>Your Templates</h2>
+
+    {% if templates %}
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Template Name</th>
+                    <th>Exam Title</th>
+                    <th>Course Code</th>
+                    <th>Course Name</th>
+                    <th>Time Duration</th>
+                    <th>Max Marks</th>
+                    <th>Sections</th>
+                    <th>Created At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for template in templates %}
+                    <tr>
+                        <td>{{ template.template_name }}</td>
+                        <td>{{ template.exam_title }}</td>
+                        <td>{{ template.course_code }}</td>
+                        <td>{{ template.course_name }}</td>
+                        <td>{{ template.time_duration }}</td>
+                        <td>{{ template.max_marks }}</td>
+                        <td>
+                            {% for section, details in template.sections.items %}
+                                <strong>Section {{ section }}:</strong> 
+                                {{ details.questions }} Questions, 
+                                {{ details.marks_per_question }} Marks per Question<br>
+                            {% endfor %}
+                        </td>
+                        <td>{{ template.created_at|date:"d M Y, H:i" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No templates available. Please create one!</p>
+    {% endif %}
+{% endblock %}

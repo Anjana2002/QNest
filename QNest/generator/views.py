@@ -186,19 +186,19 @@ def upload_files(request):
                         - Do NOT repeat questions from the previous exam paper.
 
                         ---
-                        ### **Question Paper Format (Follow This Exactly)**
-                        **Name:** ________________  
-                        **Reg No:** ________________  
+                        Question Paper Format (Follow This Exactly)
+                        Name: ________________  
+                        Reg No: ________________  
 
-                        **{template.exam_title}**  
-                        **Course Code:** {template.course_code}  
-                        **Course Name:** {template.course_name}  
-                        **Time Duration:** {template.time_duration}  
-                        **Max Marks:** {template.max_marks}  
+                        {template.exam_title}  
+                        Course Code: {template.course_code}  
+                        Course Name: {template.course_name}  
+                        Time Duration: {template.time_duration}  
+                        Max Marks: {template.max_marks}  
 
                         ---
 
-                        ### **Sections (Follow These EXACTLY)**  
+                        Sections (Follow These EXACTLY) 
                         {sections_formatted}
 
                        
@@ -215,7 +215,7 @@ def upload_files(request):
                         3. **Do NOT modify the question numbering, section names, or formatting.**  
                         4. **Ensure difficulty is appropriate for university-level exams.**  
 
-                        **Generate the Final Question Paper Below (Follow Formatting Exactly):**
+                        Generate the Final Question Paper Below (Follow Formatting Exactly):
                         """
 
             print(prompt)
@@ -249,3 +249,9 @@ def upload_files(request):
     print("Templates in DB:", list(Template.objects.filter(user=request.user)))  
     print("Templates Passed to Template:", list(templates)) 
     return render(request, "upload.html", {"templates": templates}) 
+
+
+@login_required
+def template_view(request):
+    templates = Template.objects.filter(user=request.user).order_by("-created_at")
+    return  render(request, 'template.html', {'templates':templates})
