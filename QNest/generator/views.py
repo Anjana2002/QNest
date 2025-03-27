@@ -198,14 +198,14 @@ def upload_files(request):
 
                         ---
 
-                        Sections (Follow These EXACTLY) 
+                        Sections
                         {sections_formatted}
 
                        
 
                         ---
 
-                        ### **Study Material (Use to Generate New Questions, NO Copy-Pasting):**  
+                        **Study Material (Use to Generate New Questions, NO Copy-Pasting):**  
                         {study_text[:4000]}
 
                         ---
@@ -255,3 +255,7 @@ def upload_files(request):
 def template_view(request):
     templates = Template.objects.filter(user=request.user).order_by("-created_at")
     return  render(request, 'template.html', {'templates':templates})
+
+@login_required
+def question_view(request):
+    return render(request, 'question.html')

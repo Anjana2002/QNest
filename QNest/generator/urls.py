@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import home, register, user_logout, upload_files, create_template,template_view
+from .views import home, question_view, register, user_logout, upload_files, create_template,template_view
 
 urlpatterns = [
     path("", home, name="home"), 
@@ -9,4 +9,5 @@ urlpatterns = [
     # path("download_pdf/", download_pdf, name="download_pdf"),
     path("create-template/", create_template, name="create_template"),
     path('templates/', template_view, name='template_view'),
+    path('view-question/', question_view, name='question_view')
 ]
