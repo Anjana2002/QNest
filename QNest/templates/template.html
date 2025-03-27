@@ -4,44 +4,38 @@
 {% block title %}Templates{% endblock %}
 
 {% block content %}
-    <h2>Your Templates</h2>
+<h2>Your Templates</h2>
 
-    {% if templates %}
-        <table border="1">
-            <thead>
-                <tr>
-                    <th>Template Name</th>
-                    <th>Exam Title</th>
-                    <th>Course Code</th>
-                    <th>Course Name</th>
-                    <th>Time Duration</th>
-                    <th>Max Marks</th>
-                    <th>Sections</th>
-                    <th>Created At</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for template in templates %}
-                    <tr>
-                        <td>{{ template.template_name }}</td>
-                        <td>{{ template.exam_title }}</td>
-                        <td>{{ template.course_code }}</td>
-                        <td>{{ template.course_name }}</td>
-                        <td>{{ template.time_duration }}</td>
-                        <td>{{ template.max_marks }}</td>
-                        <td>
-                            {% for section, details in template.sections.items %}
-                                <strong>Section {{ section }}:</strong> 
-                                {{ details.questions }} Questions, 
-                                {{ details.marks_per_question }} Marks per Question<br>
-                            {% endfor %}
-                        </td>
-                        <td>{{ template.created_at|date:"d M Y, H:i" }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>No templates available. Please create one!</p>
-    {% endif %}
+{% if templates %}
+    <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+        {% for template in templates %}
+            <div style="width: 300px; border: 1px solid #ccc; border-radius: 8px; padding: 16px; box-shadow: 2px 2px 8px rgba(0,0,0,0.1);">
+                <h3>{{ template.template_name }}</h3>
+                <p><strong>Exam Title:</strong> {{ template.exam_title }}</p>
+                <p><strong>Course Code:</strong> {{ template.course_code }}</p>
+                <p><strong>Course Name:</strong> {{ template.course_name }}</p>
+                <p><strong>Time Duration:</strong> {{ template.time_duration }}</p>
+                <p><strong>Max Marks:</strong> {{ template.max_marks }}</p>
+                <p><strong>Created At:</strong> {{ template.created_at|date:"d M Y, H:i" }}</p>
+                
+                {% if template.sections %}
+                    <details>
+                        <summary><strong>View Sections</strong></summary>
+                        {% for section in template.sections %}
+                            <p><strong>Section {{ section.section_name }}:</strong></p>
+                            <p>Questions: {{ section.questions }}</p>
+                            <p>Marks per Question: {{ section.marks_per_question }}</p>
+                            <p>Instructions: {{ section.instructions }}</p>
+                            <hr>
+                        {% endfor %}
+                    </details>
+                {% else %}
+                    <p>No sections available.</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No templates available. Please create one!</p>
+{% endif %}
 {% endblock %}
