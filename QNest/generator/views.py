@@ -259,3 +259,31 @@ def template_view(request):
 @login_required
 def question_view(request):
     return render(request, 'question.html')
+
+@login_required
+def mcq(request):
+    if request.method=='POST':
+        print(request.POST)
+        if 'genertae_mcq' in request.POST:
+            study_material = request.FILES.getlist('study_material')
+            study_texts =[extract_text_from_pdf(pdf) for pdf in study_material]
+            study_text = "\n\n".join(study_texts)
+            
+            prompt = f"""
+                    You are an expert in generating multiple choice questions (MCQs) for university-level students.
+                    Your task is to generate 10 MCQs using the study material provided below.
+
+                    ### Instructions:
+                    1. Generate questions covering key concepts, definitions, and facts.
+                    2. Provide **4 answer choices** per question, with one correct answer.
+                    3. Mark the correct answer using "**(Correct Answer)**".
+                    4. Ensure questions are well-structured and error-free.
+                    5. Avoid repeating questions and ensure clarity.
+
+                    ### Study Material:
+                    
+            {study_text[:4000]}
+            """
+
+                
+    return render(request, 'mcq.html')

@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}MCQ{% endblock %}
+
+{% block content %}
+<h1>MCQ</h1><br>
+<h2>Upload Study Material</h2><br>
+<form id="upload-form" method="POST" enctype="multipart/form-data">
+    
+    <label for="study_material">Study Material:</label>
+    <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple><br><br>
+
+    <button type="submit" name="generate_mcq">Generate MCQ</button>
+</form>
+{% endblock %}
