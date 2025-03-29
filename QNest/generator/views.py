@@ -264,27 +264,43 @@ def question_view(request):
 def mcq(request):
     if request.method == 'POST' and 'generate_mcq' in request.POST:
         study_material = request.FILES.getlist('study_material')
+        num_questions = request.POST.get('q_no', 10)  # Default to 10 questions if not provided
         
+        # Ensure study material is uploaded
         if not study_material:
             return render(request, 'mcq.html', {'error': 'Please upload study material.'})
+        
+        # Validate number of questions
+        try:
+            num_questions = int(num_questions)
+            if num_questions <= 0:
+                raise ValueError("Number of questions must be a positive integer.")
+        except ValueError as e:
+            return render(request, 'mcq.html', {'error': str(e)})
 
         try:
+            # Extract text from PDFs
             study_texts = [extract_text_from_pdf(pdf) for pdf in study_material]
             study_text = "\n\n".join(study_texts)
-            
+
             if not study_text.strip():
                 return render(request, 'mcq.html', {'error': 'Failed to extract text from PDFs.'})
 
+            # Construct prompt
             prompt = f"""
-            Generate 10 high-quality multiple choice questions (MCQs) based on the following study material.
-            Each question should have 4 options with one clearly marked correct answer.
-            Format each question like this example:
+            You are an expert in creating multiple choice questions.
+            Generate {num_questions} high-quality multiple choice questions (MCQs) based on the following study material.
+            Each question should have 4 options with one correct answer.
+            Provide the correct answer separately under a 'Key Answer' section.
 
-            1. What is the capital of France?
-            A) London
-            B) Berlin
-            C) Paris (Correct Answer)
-            D) Rome
+            Format each question like this:
+            Question number: <Your Question>
+            A) <Option 1>
+            B) <Option 2>
+            C) <Option 3>
+            D) <Option 4>
+
+            Key Answer: <Correct Option>
 
             Study Material:
             {study_text[:4000]}
@@ -296,14 +312,18 @@ def mcq(request):
                 stream=False
             )
 
-            # Check if response contains 'message' and extract the content
             if 'message' in response and 'content' in response['message']:
-                questions = response['message']['content'].strip()
-                if questions:
-                    return render(request, 'mcq.html', {'questions': questions})
-                else:
-                    return render(request, 'mcq.html', {'error': 'No questions generated.'})
-            
+                questions_text = response['message']['content'].strip()
+
+                
+                questions_part, key_answers_part = questions_text.split("Key Answer:", 1) if "Key Answer:" in questions_text else (questions_text, "No key answers found.")
+                
+                return render(request, 'mcq.html', {
+                    'questions': questions_part.strip(),
+                    'key_answers': key_answers_part.strip(),
+                    'success': True
+                })
+
             return render(request, 'mcq.html', {'error': 'Unexpected response format from Ollama.'})
 
         except Exception as e:
@@ -311,4 +331,5 @@ def mcq(request):
             return render(request, 'mcq.html', {'error': f"An error occurred: {str(e)}"})
 
     return render(request, 'mcq.html')
+
 

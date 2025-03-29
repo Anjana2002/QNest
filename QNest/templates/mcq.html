@@ -3,23 +3,83 @@
 {% block title %}MCQ Generator{% endblock %}
 
 {% block content %}
-<h1>Generate Multiple Choice Questions (MCQs)</h1>
-<h2>Upload Study Material (PDFs Only)</h2>
+<h1>Multiple Choice Questions</h1>
+<h2>Upload Study Material </h2>
 
 <form id="upload-form" method="POST" enctype="multipart/form-data">
     {% csrf_token %}
     <label for="study_material">Study Material:</label>
     <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple><br><br>
+    
+    <label for="q_no">Number of Questions (Minimum 10):</label>
+    <input type="number" id="q_no" name="q_no" min="10" value="10"><br><br>
+    
     <button type="submit" name="generate_mcq">Generate MCQ</button>
 </form>
 
-<!-- Display Questions if Available -->
 {% if questions %}
-    <h2>Generated MCQs</h2>
-    <pre>{{ questions }}</pre>
+    <div id="question-section">
+        <h2>Generated MCQs</h2>
+        <pre id="question-paper">{{ questions }}</pre>
+    </div>
+
+    <div id="answer-section">
+        <h2>Key Answers</h2>
+        <pre id="answer-key">{{ key_answers }}</pre>
+    </div>
+    
+    <button type="button" onclick="printQuestionPaper()">Print Question Paper</button>
+    <button type="button" onclick="printAnswerKey()">Print Answer Key</button>
+    <button type="button" onclick="downloadAsPDF()">Download as PDF</button>
 {% elif error %}
     <p style="color:red;">{{ error }}</p>
 {% endif %}
 
-{% endblock %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+    const { jsPDF } = window.jspdf;
 
+    function printQuestionPaper() {
+        const printWindow = window.open('', '', 'height=600,width=800');
+        printWindow.document.write('<html><head><title>Print Question Paper</title></head><body>');
+        printWindow.document.write('<h2>Generated Question Paper</h2>');
+        printWindow.document.write('<pre>' + document.getElementById("question-paper").innerText + '</pre>');
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+    }
+
+    function printAnswerKey() {
+        const printWindow = window.open('', '', 'height=600,width=800');
+        printWindow.document.write('<html><head><title>Print Answer Key</title></head><body>');
+        printWindow.document.write('<h2>Answer Key</h2>');
+        printWindow.document.write('<pre>' + document.getElementById("answer-key").innerText + '</pre>');
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+    }
+
+    // ✅ Download as PDF with Questions and Answers on Separate Pages
+    async function downloadAsPDF() {
+        const doc = new jsPDF();
+        
+        // Add Questions
+        const questionText = document.getElementById("question-paper").innerText;
+        const questionLines = doc.splitTextToSize(questionText, 180);
+        doc.setFontSize(12);
+        doc.text('Generated Question Paper', 10, 10);
+        doc.text(questionLines, 10, 20);
+        doc.addPage(); // Separate sheet for the Answer Key
+
+        // Add Answer Key
+        const answerText = document.getElementById("answer-key").innerText;
+        const answerLines = doc.splitTextToSize(answerText, 180);
+        doc.text('Answer Key', 10, 10);
+        doc.text(answerLines, 10, 20);
+
+        // Save PDF
+        doc.save("Generated_Question_Paper_with_Answer_Key.pdf");
+    }
+</script>
+
+{% endblock %}
