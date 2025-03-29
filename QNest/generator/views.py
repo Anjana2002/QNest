@@ -262,28 +262,53 @@ def question_view(request):
 
 @login_required
 def mcq(request):
-    if request.method=='POST':
-        print(request.POST)
-        if 'genertae_mcq' in request.POST:
-            study_material = request.FILES.getlist('study_material')
-            study_texts =[extract_text_from_pdf(pdf) for pdf in study_material]
+    if request.method == 'POST' and 'generate_mcq' in request.POST:
+        study_material = request.FILES.getlist('study_material')
+        
+        if not study_material:
+            return render(request, 'mcq.html', {'error': 'Please upload study material.'})
+
+        try:
+            study_texts = [extract_text_from_pdf(pdf) for pdf in study_material]
             study_text = "\n\n".join(study_texts)
             
+            if not study_text.strip():
+                return render(request, 'mcq.html', {'error': 'Failed to extract text from PDFs.'})
+
             prompt = f"""
-                    You are an expert in generating multiple choice questions (MCQs) for university-level students.
-                    Your task is to generate 10 MCQs using the study material provided below.
+            Generate 10 high-quality multiple choice questions (MCQs) based on the following study material.
+            Each question should have 4 options with one clearly marked correct answer.
+            Format each question like this example:
 
-                    ### Instructions:
-                    1. Generate questions covering key concepts, definitions, and facts.
-                    2. Provide **4 answer choices** per question, with one correct answer.
-                    3. Mark the correct answer using "**(Correct Answer)**".
-                    4. Ensure questions are well-structured and error-free.
-                    5. Avoid repeating questions and ensure clarity.
+            1. What is the capital of France?
+            A) London
+            B) Berlin
+            C) Paris (Correct Answer)
+            D) Rome
 
-                    ### Study Material:
-                    
+            Study Material:
             {study_text[:4000]}
             """
+            
+            response = ollama.chat(
+                model="mistral",
+                messages=[{"role": "user", "content": prompt}],
+                stream=False
+            )
 
-                
+            # Check if response contains 'message' and extract the content
+            if 'message' in response and 'content' in response['message']:
+                questions = response['message']['content'].strip()
+                if questions:
+                    return render(request, 'mcq.html', {'questions': questions})
+                else:
+                    return render(request, 'mcq.html', {'error': 'No questions generated.'})
+            
+            return render(request, 'mcq.html', {'error': 'Unexpected response format from Ollama.'})
+
+        except Exception as e:
+            print(f"Error during MCQ generation: {str(e)}")
+            return render(request, 'mcq.html', {'error': f"An error occurred: {str(e)}"})
+
     return render(request, 'mcq.html')
+

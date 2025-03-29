@@ -1,14 +1,25 @@
 {% extends 'base.html' %}
-{% block title %}MCQ{% endblock %}
+
+{% block title %}MCQ Generator{% endblock %}
 
 {% block content %}
-<h1>MCQ</h1><br>
-<h2>Upload Study Material</h2><br>
+<h1>Generate Multiple Choice Questions (MCQs)</h1>
+<h2>Upload Study Material (PDFs Only)</h2>
+
 <form id="upload-form" method="POST" enctype="multipart/form-data">
-    
+    {% csrf_token %}
     <label for="study_material">Study Material:</label>
     <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple><br><br>
-
     <button type="submit" name="generate_mcq">Generate MCQ</button>
 </form>
+
+<!-- Display Questions if Available -->
+{% if questions %}
+    <h2>Generated MCQs</h2>
+    <pre>{{ questions }}</pre>
+{% elif error %}
+    <p style="color:red;">{{ error }}</p>
+{% endif %}
+
 {% endblock %}
+
