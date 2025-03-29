@@ -1,4 +1,5 @@
 # QNest - AI-Powered Question Paper Generator
+![Alt Text](QNest/static/images/logo.ico)
 
 QNest is an AI-powered web application designed to generate university-level question papers using study materials, previous question papers, and customizable templates. Built using **Django** for the backend and powered by **Ollama** for AI-driven question generation, QNest streamlines the exam creation process for educators.
 
