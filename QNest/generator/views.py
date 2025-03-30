@@ -264,7 +264,7 @@ def question_view(request):
 def mcq(request):
     if request.method == 'POST' and 'generate_mcq' in request.POST:
         study_material = request.FILES.getlist('study_material')
-        num_questions = request.POST.get('q_no', 10)  # Default to 10 questions if not provided
+        num_questions = request.POST.get('q_no', 10)
         
         # Ensure study material is uploaded
         if not study_material:
@@ -273,8 +273,8 @@ def mcq(request):
         # Validate number of questions
         try:
             num_questions = int(num_questions)
-            if num_questions <= 0:
-                raise ValueError("Number of questions must be a positive integer.")
+            if num_questions < 10:
+                raise ValueError("Number of questions must be at least 10.")
         except ValueError as e:
             return render(request, 'mcq.html', {'error': str(e)})
 
@@ -288,36 +288,45 @@ def mcq(request):
 
             # Construct prompt
             prompt = f"""
-            You are an expert in creating multiple choice questions.
-            Generate {num_questions} high-quality multiple choice questions (MCQs) based on the following study material.
-            Each question should have 4 options with one correct answer.
-            Provide the correct answer separately under a 'Key Answer' section.
+            You are an expert in creating university-level multiple choice questions (MCQs).
+            Generate {num_questions} high-quality MCQs based on the study material below.
+            
+            - Each question should have **4 options** with one correct answer.
+            - Provide the correct answer separately under a **'Key Answers'** section.
+            
+            ### **Format for Questions**  
+            1. <Question>  
+            A) <Option 1>  
+            B) <Option 2>  
+            C) <Option 3>  
+            D) <Option 4>  
 
-            Format each question like this:
-            Question number: <Your Question>
-            A) <Option 1>
-            B) <Option 2>
-            C) <Option 3>
-            D) <Option 4>
-
-            Key Answer: <Correct Option>
-
+            ### **Key Answer Format**  
+            1. <Correct Option>  
+            2. <Correct Option>  
+            3. <Correct Option>  
+            ...
+            
             Study Material:
             {study_text[:4000]}
             """
-            
+
             response = ollama.chat(
                 model="mistral",
                 messages=[{"role": "user", "content": prompt}],
                 stream=False
             )
 
+            # Validate response
             if 'message' in response and 'content' in response['message']:
                 questions_text = response['message']['content'].strip()
 
-                
-                questions_part, key_answers_part = questions_text.split("Key Answer:", 1) if "Key Answer:" in questions_text else (questions_text, "No key answers found.")
-                
+                # Extract questions and key answers
+                if "Key Answers" in questions_text:
+                    questions_part, key_answers_part = questions_text.split("Key Answers:", 1)
+                else:
+                    questions_part, key_answers_part = questions_text, "No key answers found."
+
                 return render(request, 'mcq.html', {
                     'questions': questions_part.strip(),
                     'key_answers': key_answers_part.strip(),

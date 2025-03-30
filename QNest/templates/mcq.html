@@ -18,67 +18,54 @@
 </form>
 
 {% if questions %}
+    <!-- Questions Section -->
     <div id="question-section">
         <h2>Generated MCQs</h2>
         <pre id="question-paper">{{ questions }}</pre>
     </div>
 
+    <!-- Answer Key Section -->
     <div id="answer-section">
         <h2>Key Answers</h2>
         <pre id="answer-key">{{ key_answers }}</pre>
     </div>
     
-    <button type="button" onclick="printQuestionPaper()">Print Question Paper</button>
-    <button type="button" onclick="printAnswerKey()">Print Answer Key</button>
-    <button type="button" onclick="downloadAsPDF()">Download as PDF</button>
+    <!-- Buttons for Printing and Downloading -->
+    <button type="button" onclick="printContent('question-paper', 'Generated Question Paper')">Print Question Paper</button>
+    <button type="button" onclick="printContent('answer-key', 'Answer Key')">Print Answer Key</button>
+    <button type="button" onclick="downloadPDF('question-paper', 'Generated_Question_Paper.pdf', 'Generated Question Paper')">Download Question Paper as PDF</button>
+    <button type="button" onclick="downloadPDF('answer-key', 'Answer_Key.pdf', 'Answer Key')">Download Answer Key as PDF</button>
 {% elif error %}
     <p style="color:red;">{{ error }}</p>
 {% endif %}
 
+<!-- Import jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
     const { jsPDF } = window.jspdf;
 
-    function printQuestionPaper() {
+    // ✅ Print Function
+    function printContent(elementId, title) {
+        const content = document.getElementById(elementId).innerText;
         const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write('<html><head><title>Print Question Paper</title></head><body>');
-        printWindow.document.write('<h2>Generated Question Paper</h2>');
-        printWindow.document.write('<pre>' + document.getElementById("question-paper").innerText + '</pre>');
+        printWindow.document.write('<html><head><title>' + title + '</title></head><body>');
+        printWindow.document.write('<h2>' + title + '</h2>');
+        printWindow.document.write('<pre>' + content + '</pre>');
         printWindow.document.write('</body></html>');
         printWindow.document.close();
         printWindow.print();
     }
 
-    function printAnswerKey() {
-        const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write('<html><head><title>Print Answer Key</title></head><body>');
-        printWindow.document.write('<h2>Answer Key</h2>');
-        printWindow.document.write('<pre>' + document.getElementById("answer-key").innerText + '</pre>');
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        printWindow.print();
-    }
-
-    // ✅ Download as PDF with Questions and Answers on Separate Pages
-    async function downloadAsPDF() {
+    // ✅ Download PDF Function
+    async function downloadPDF(elementId, fileName, title) {
         const doc = new jsPDF();
-        
-        // Add Questions
-        const questionText = document.getElementById("question-paper").innerText;
-        const questionLines = doc.splitTextToSize(questionText, 180);
+        const content = document.getElementById(elementId).innerText;
+        const lines = doc.splitTextToSize(content, 180);
         doc.setFontSize(12);
-        doc.text('Generated Question Paper', 10, 10);
-        doc.text(questionLines, 10, 20);
-        doc.addPage(); // Separate sheet for the Answer Key
+        doc.text(title, 10, 10);
+        doc.text(lines, 10, 20);
 
-        // Add Answer Key
-        const answerText = document.getElementById("answer-key").innerText;
-        const answerLines = doc.splitTextToSize(answerText, 180);
-        doc.text('Answer Key', 10, 10);
-        doc.text(answerLines, 10, 20);
-
-        // Save PDF
-        doc.save("Generated_Question_Paper_with_Answer_Key.pdf");
+        doc.save(fileName);
     }
 </script>
 
