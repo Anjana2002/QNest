@@ -11,7 +11,7 @@
     <label for="study_material">Study Material:</label>
     <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple><br><br>
     
-    <label for="q_no">Number of Questions (Minimum 10):</label>
+    <label for="q_no">Number of Questions :</label>
     <input type="number" id="q_no" name="q_no" min="10" value="10"><br><br>
     
     <button type="submit" name="generate_mcq">Generate MCQ</button>
@@ -21,13 +21,21 @@
     <!-- Questions Section -->
     <div id="question-section">
         <h2>Generated MCQs</h2>
-        <pre id="question-paper">{{ questions }}</pre>
+        <div id="question-paper">
+            {% for question in questions_list %}
+                <p>{{ question }}</p>
+            {% endfor %}
+        </div>
     </div>
 
     <!-- Answer Key Section -->
     <div id="answer-section">
         <h2>Key Answers</h2>
-        <pre id="answer-key">{{ key_answers }}</pre>
+        <div id="answer-key">
+            {% for answer in answers_list %}
+                <p>{{ answer }}</p>
+            {% endfor %}
+        </div>
     </div>
     
     <!-- Buttons for Printing and Downloading -->
@@ -44,19 +52,19 @@
 <script>
     const { jsPDF } = window.jspdf;
 
-    // ✅ Print Function
+    // Print Function
     function printContent(elementId, title) {
-        const content = document.getElementById(elementId).innerText;
+        const content = document.getElementById(elementId).innerHTML;
         const printWindow = window.open('', '', 'height=600,width=800');
         printWindow.document.write('<html><head><title>' + title + '</title></head><body>');
         printWindow.document.write('<h2>' + title + '</h2>');
-        printWindow.document.write('<pre>' + content + '</pre>');
+        printWindow.document.write(content);
         printWindow.document.write('</body></html>');
         printWindow.document.close();
         printWindow.print();
     }
-
-    // ✅ Download PDF Function
+    
+    // Download PDF Function
     async function downloadPDF(elementId, fileName, title) {
         const doc = new jsPDF();
         const content = document.getElementById(elementId).innerText;
@@ -69,4 +77,4 @@
     }
 </script>
 
-{% endblock %}
+{% endblock %}  

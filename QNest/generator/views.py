@@ -264,19 +264,10 @@ def question_view(request):
 def mcq(request):
     if request.method == 'POST' and 'generate_mcq' in request.POST:
         study_material = request.FILES.getlist('study_material')
-        num_questions = request.POST.get('q_no', 10)
+        num_questions = int(request.POST.get('q_no', 10))
         
-        # Ensure study material is uploaded
         if not study_material:
             return render(request, 'mcq.html', {'error': 'Please upload study material.'})
-        
-        # Validate number of questions
-        try:
-            num_questions = int(num_questions)
-            if num_questions < 10:
-                raise ValueError("Number of questions must be at least 10.")
-        except ValueError as e:
-            return render(request, 'mcq.html', {'error': str(e)})
 
         try:
             # Extract text from PDFs
@@ -291,22 +282,17 @@ def mcq(request):
             You are an expert in creating university-level multiple choice questions (MCQs).
             Generate {num_questions} high-quality MCQs based on the study material below.
             
-            - Each question should have **4 options** with one correct answer.
-            - Provide the correct answer separately under a **'Key Answers'** section.
+            - Each question should have 4 options with one correct answer.
+            - First list all questions with their options.
+            - Then provide all correct answers together under a 'Key Answers' section.
             
-            ### **Format for Questions**  
+            Format for Questions 
             1. <Question>  
             A) <Option 1>  
             B) <Option 2>  
             C) <Option 3>  
             D) <Option 4>  
-
-            ### **Key Answer Format**  
-            1. <Correct Option>  
-            2. <Correct Option>  
-            3. <Correct Option>  
-            ...
-            
+            a line break then the next question
             Study Material:
             {study_text[:4000]}
             """
@@ -317,19 +303,24 @@ def mcq(request):
                 stream=False
             )
 
-            # Validate response
             if 'message' in response and 'content' in response['message']:
-                questions_text = response['message']['content'].strip()
-
-                # Extract questions and key answers
-                if "Key Answers" in questions_text:
-                    questions_part, key_answers_part = questions_text.split("Key Answers:", 1)
+                content = response['message']['content'].strip()
+                
+                # Split into questions and answers
+                if "Key Answers" in content:
+                    questions_part, answers_part = content.split("Key Answers", 1)
                 else:
-                    questions_part, key_answers_part = questions_text, "No key answers found."
+                    questions_part, answers_part = content, "No key answers found."
+
+                # Split into lists for better rendering
+                questions_list = [q.strip() for q in questions_part.split('\n') if q.strip()]
+                answers_list = [a.strip() for a in answers_part.split('\n') if a.strip()]
 
                 return render(request, 'mcq.html', {
                     'questions': questions_part.strip(),
-                    'key_answers': key_answers_part.strip(),
+                    'key_answers': answers_part.strip(),
+                    'questions_list': questions_list,
+                    'answers_list': answers_list,
                     'success': True
                 })
 
@@ -340,5 +331,3 @@ def mcq(request):
             return render(request, 'mcq.html', {'error': f"An error occurred: {str(e)}"})
 
     return render(request, 'mcq.html')
-
-
