@@ -1,5 +1,7 @@
 from django.urls import path
 from .views import home, question_view, register, user_logout, upload_files, create_template,template_view, mcq
+from django.conf.urls.static import static
+from django.conf import settings
 
 urlpatterns = [
     path("", home, name="home"), 
@@ -11,4 +13,4 @@ urlpatterns = [
     path('templates/', template_view, name='template_view'),
     path('view-question/', question_view, name='question_view'),
     path('mcq/', mcq, name='mcq')
-]
+]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

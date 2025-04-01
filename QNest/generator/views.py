@@ -155,7 +155,7 @@ def upload_files(request):
             if not study_text.strip():
                 return JsonResponse({"error": "Study material text extraction failed."}, status=400)
 
-            # Extract previous question paper (Optional)
+            
             prev_texts = [extract_text_from_pdf(pdf) for pdf in request.FILES.getlist("previous_question", [])]
             prev_text = "\n\n".join(prev_texts) if prev_texts else ""
 
