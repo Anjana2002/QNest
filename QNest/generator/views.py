@@ -174,53 +174,48 @@ def upload_files(request):
 
 
             prompt = f"""
-                    You are an expert in university-level question paper creation.
-                    Your task is to generate a question paper **STRICTLY following the given template.**
-                    You MUST maintain the same **number of sections, question count per section, and marks distribution.**
+                        You are an expert in university-level question paper creation.
+                        Your task is to generate a question paper **STRICTLY following the given template.**
+                        You MUST maintain the same **number of sections, question count per section, and marks distribution.**
 
-                    ### **DO NOT:**
-                    - Do NOT modify the number of sections or their order.
-                    - Do NOT add or remove questions.
-                    - Do NOT change the marks distribution.
-                    - Do NOT repeat questions from the previous exam paper.
+                         ### **DO NOT:**
+                        - Do NOT modify the number of sections or their order.
+                        - Do NOT add or remove questions.
+                        - Do NOT change the marks distribution.
+                        - Do NOT repeat questions from the previous exam paper.
 
-                    ---
-                   
-                    Name: ________________  
-                    Reg No: ________________  
+                        ---
+                        Question Paper Format (Follow This Exactly)
+                        Name: ________________  
+                        Reg No: ________________  
 
-                    {template.exam_title}  
-                    Course Code: {template.course_code}  
-                    Course Name: {template.course_name}  
-                    Time Duration: {template.time_duration}  
-                    Max Marks: {template.max_marks}  
+                        {template.exam_title}  
+                        Course Code: {template.course_code}  
+                        Course Name: {template.course_name}  
+                        Time Duration: {template.time_duration}  
+                        Max Marks: {template.max_marks}  
 
-                    ---
-                   
-                    {sections_formatted}
+                        ---
 
-                    ---
-                    ### **Study Material (Use to Generate New Questions, NO Copy-Pasting)**  
-                    {study_text}
+                        Sections
+                        {sections_formatted}
 
-                    ---
-                     
-                    {prev_text if prev_text else "No previous exam paper provided."}
+                       
 
-                    ---
-                    ### **Rules for Question Generation:**  
-                    1. **Strictly follow the provided template** (same sections, number of questions, marks).  
-                    2. **Use the previous exam paper as a reference** (if provided), but **DO NOT** repeat questions.  
-                    3. **Ensure each question is valuable and appropriate for its assigned marks.**  
-                    - **Higher mark questions** should require deeper understanding & application.  
-                    - **Lower mark questions** should be straightforward and concept-based.  
-                    4. **Do NOT modify the question numbering, section names, or formatting.**  
-                    5. **Maintain university-level difficulty and relevance.**  
+                        ---
 
-                    ---
-                    ### **Generate the Final Question Paper Below (Follow Formatting Exactly):**
-                    """
+                        **Study Material (Use to Generate New Questions, NO Copy-Pasting):**  
+                        {study_text}
 
+                        ---
+                         **Rules for Generation:**  
+                        1. **Strictly follow the provided template** (same sections, number of questions, marks).  
+                        2. **Use the previous exam paper as a reference (if provided), but DO NOT repeat questions.**  
+                        3. **Do NOT modify the question numbering, section names, or formatting.**  
+                        4. **Ensure difficulty is appropriate for university-level exams.**  
+
+                        Generate the Final Question Paper Below (Follow Formatting Exactly):
+                        """
 
             print(prompt)
 
