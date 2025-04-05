@@ -20,3 +20,13 @@ QNest is an AI-powered web application designed to generate university-level que
 
 
 ---
+
+##  Installation Guide
+
+Follow these steps to set up and run **QNest** locally.
+### 🛠️ Setup Instructions
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/your-username/qnest.git
+   cd qnest
