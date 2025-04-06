@@ -9,6 +9,7 @@ from .models import StudyMaterial, PreviousQuestionPaper, Template
 from PyPDF2 import PdfReader
 import ollama
 from django.contrib import messages
+import re
 
 
 def home(request):
@@ -63,12 +64,13 @@ def extract_text_from_pdf(pdf):
     text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
     return text
 
+
 @login_required
 @csrf_protect
 def create_template(request):
     """Handles template creation and saves it to the database."""
     
-    if request.method =="GET":
+    if request.method == "GET":
         return render(request, "create_template.html")
 
     if request.method == "POST":
@@ -87,23 +89,78 @@ def create_template(request):
             # Convert max_marks safely
             try:
                 max_marks = int(max_marks)
+                if max_marks <= 0:
+                    return JsonResponse({"error": "Max marks must be positive"}, status=400)
             except ValueError:
                 return JsonResponse({"error": "Invalid max marks value"}, status=400)
 
-            # Extract sections
+            # Extract and validate sections
             sections = []
             section_names = request.POST.getlist("section_name[]")
             num_questions = request.POST.getlist("num_questions[]")
             marks_per_question = request.POST.getlist("marks_per_question[]")
             instructions = request.POST.getlist("instructions[]")
 
+            if not section_names:
+                return JsonResponse({"error": "At least one section is required"}, status=400)
+
+            total_marks = 0
+            
             for i in range(len(section_names)):
-                sections.append({
-                    "section_name": section_names[i].strip(),
-                    "questions": int(num_questions[i]),
-                    "marks_per_question": int(marks_per_question[i]),
-                    "instructions": instructions[i].strip()
-                })
+                try:
+                    section_name = section_names[i].strip()
+                    questions = int(num_questions[i])
+                    marks = int(marks_per_question[i])
+                    instruction = instructions[i].strip().lower()
+                    
+                    if not section_name:
+                        return JsonResponse({"error": "Section name is required"}, status=400)
+                    if questions <= 0:
+                        return JsonResponse({"error": "Number of questions must be positive"}, status=400)
+                    if marks <= 0:
+                        return JsonResponse({"error": "Marks per question must be positive"}, status=400)
+                    
+                    # Validate instruction format
+                    if not (instruction.startswith("answer all") or 
+                           instruction.startswith("answer only")):
+                        return JsonResponse({
+                            "error": "Instructions must start with 'Answer all' or 'Answer only X'"
+                        }, status=400)
+                    
+                    # If "answer only X", validate X <= total questions
+                    if instruction.startswith("answer only"):
+                        try:
+                            answer_only = int(instruction.split(" ")[2])
+                            if answer_only > questions:
+                                return JsonResponse({
+                                    "error": f"Answer only count ({answer_only}) cannot exceed questions in section ({questions})"
+                                }, status=400)
+                        except (IndexError, ValueError):
+                            return JsonResponse({
+                                "error": "Invalid 'Answer only' format. Use 'Answer only X' where X is a number"
+                            }, status=400)
+                    
+                    section_marks = questions * marks
+                    total_marks += section_marks
+                    
+                    sections.append({
+                        "section_name": section_name,
+                        "questions": questions,
+                        "marks_per_question": marks,
+                        "instructions": instruction,
+                        "section_marks": section_marks
+                    })
+                
+                except IndexError:
+                    return JsonResponse({"error": "Incomplete section data"}, status=400)
+                except ValueError as ve:
+                    return JsonResponse({"error": f"Invalid section data: {str(ve)}"}, status=400)
+
+            # Validate total marks matches max marks
+            if total_marks != max_marks:
+                return JsonResponse({
+                    "error": f"Total section marks ({total_marks}) don't match max marks ({max_marks})"
+                }, status=400)
 
             # Save template to DB
             template = Template.objects.create(

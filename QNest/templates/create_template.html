@@ -5,7 +5,7 @@
 {% block content %}
     <h2>Create Exam Template</h2>
     
-    <form method="POST" action="{% url 'create_template' %}">
+    <form method="POST" action="{% url 'create_template' %}" id="template-form">
         {% csrf_token %}
 
         <label>Template Name:</label>
@@ -24,60 +24,148 @@
         <input type="text" name="time_duration" required><br>
 
         <label>Max Marks:</label>
-        <input type="number" name="max_marks" required><br>
+        <input type="number" name="max_marks" id="max_marks" required min="1"><br>
 
         <h3>Sections</h3>
         <div id="sections-container"></div>
         <button type="button" id="add-section-btn">Add Section</button><br><br>
 
+        <div id="total-marks-display">Total Marks: 0</div><br>
+
         <button type="submit">Save Template</button>
     </form>
 
     <script>
-        // Ensure the script runs after the DOM is loaded
         document.addEventListener("DOMContentLoaded", function () {
             const addSectionBtn = document.getElementById("add-section-btn");
-            if (!addSectionBtn) {
-                console.error("Add section button not found.");
-                return;
+            const form = document.getElementById("template-form");
+            const maxMarksInput = document.getElementById("max_marks");
+            const totalMarksDisplay = document.getElementById("total-marks-display");
+
+            if (addSectionBtn) {
+                addSectionBtn.addEventListener("click", addSection);
             }
 
-            addSectionBtn.addEventListener("click", addSection);
-        });
+            // Add first section by default
+            addSection();
 
-        function addSection() {
-            let sectionsContainer = document.getElementById("sections-container");
-
-            if (!sectionsContainer) {
-                console.error("Sections container not found.");
-                return;
+            function updateTotalMarks() {
+                let total = 0;
+                const sectionItems = document.querySelectorAll(".section-item");
+                
+                sectionItems.forEach(section => {
+                    const numQuestions = parseInt(section.querySelector("[name='num_questions[]']").value) || 0;
+                    const marksPerQuestion = parseInt(section.querySelector("[name='marks_per_question[]']").value) || 0;
+                    total += numQuestions * marksPerQuestion;
+                });
+                
+                totalMarksDisplay.textContent = `Total Marks: ${total}`;
+                return total;
             }
 
-            let sectionDiv = document.createElement("div");
-            sectionDiv.classList.add("section-item");
+            function validateInstructions(instruction) {
+                instruction = instruction.toLowerCase().trim();
+                if (instruction.startsWith("answer all")) {
+                    return true;
+                }
+                if (instruction.startsWith("answer only")) {
+                    const parts = instruction.split(" ");
+                    if (parts.length === 3 && !isNaN(parts[2])) {
+                        const answerOnly = parseInt(parts[2]);
+                        const numQuestions = parseInt(instructionInput.closest(".section-item").querySelector("[name='num_questions[]']").value);
+                        return answerOnly <= numQuestions;
+                    }
+                }
+                return false;
+            }
 
-            sectionDiv.innerHTML = `
-                <label>Section Name:</label>
-                <input type="text" name="section_name[]" required><br>
+            function addSection() {
+                let sectionsContainer = document.getElementById("sections-container");
+                let sectionId = Date.now();
 
-                <label>Number of Questions:</label>
-                <input type="number" name="num_questions[]" required><br>
+                let sectionDiv = document.createElement("div");
+                sectionDiv.classList.add("section-item");
+                sectionDiv.dataset.id = sectionId;
 
-                <label>Marks per Question:</label>
-                <input type="number" name="marks_per_question[]" required><br>
+                sectionDiv.innerHTML = `
+                    <label>Section Name:</label>
+                    <input type="text" name="section_name[]" required><br>
 
-                <label>Instructions:</label>
-                <input type="text" name="instructions[]" required><br><br>
+                    <label>Number of Questions:</label>
+                    <input type="number" name="num_questions[]" required min="1"><br>
 
-                <button type="button" class="remove-section-btn">Remove Section</button><br><br>
-            `;
+                    <label>Marks per Question:</label>
+                    <input type="number" name="marks_per_question[]" required min="1"><br>
 
-            sectionsContainer.appendChild(sectionDiv);
+                    <label>Instructions (e.g., "Answer all" or "Answer only 4"):</label>
+                    <input type="text" name="instructions[]" required 
+                           placeholder="Answer all or Answer only X"><br>
 
-            // Add event listener to remove section
-            sectionDiv.querySelector(".remove-section-btn").addEventListener("click", function () {
-                sectionDiv.remove();
+                    <span class="instruction-error" style="color:red;display:none;">
+                        Must be "Answer all" or "Answer only X" where X ≤ questions
+                    </span><br>
+
+                    <button type="button" class="remove-section-btn">Remove Section</button><br><br>
+                `;
+
+                sectionsContainer.appendChild(sectionDiv);
+
+                // Add event listeners for dynamic validation
+                const inputs = sectionDiv.querySelectorAll("input");
+                inputs.forEach(input => {
+                    input.addEventListener("change", function() {
+                        updateTotalMarks();
+                        
+                        // Validate instructions when they change
+                        if (input.name === "instructions[]") {
+                            const isValid = validateInstructions(input.value);
+                            const errorSpan = input.closest(".section-item").querySelector(".instruction-error");
+                            errorSpan.style.display = isValid ? "none" : "inline";
+                        }
+                        
+                        // Validate num_questions vs instructions when questions change
+                        if (input.name === "num_questions[]") {
+                            const instructionInput = input.closest(".section-item").querySelector("[name='instructions[]']");
+                            const isValid = validateInstructions(instructionInput.value);
+                            const errorSpan = input.closest(".section-item").querySelector(".instruction-error");
+                            errorSpan.style.display = isValid ? "none" : "inline";
+                        }
+                    });
+                });
+
+                sectionDiv.querySelector(".remove-section-btn").addEventListener("click", function () {
+                    sectionDiv.remove();
+                    updateTotalMarks();
+                });
+            }
+
+            // Form submission validation
+            form.addEventListener("submit", function(e) {
+                const maxMarks = parseInt(maxMarksInput.value);
+                const totalMarks = updateTotalMarks();
+                
+                // Validate total marks vs max marks
+                if (totalMarks !== maxMarks) {
+                    alert(`Total section marks (${totalMarks}) don't match max marks (${maxMarks})`);
+                    e.preventDefault();
+                    return;
+                }
+                
+                // Validate all instructions
+                let allInstructionsValid = true;
+                document.querySelectorAll("[name='instructions[]']").forEach(input => {
+                    if (!validateInstructions(input.value)) {
+                        allInstructionsValid = false;
+                        const errorSpan = input.closest(".section-item").querySelector(".instruction-error");
+                        errorSpan.style.display = "inline";
+                    }
+                });
+                
+                if (!allInstructionsValid) {
+                    alert("Please fix all instruction fields. They must be 'Answer all' or 'Answer only X' where X ≤ number of questions.");
+                    e.preventDefault();
+                }
             });
-        }
+        });
     </script>
 {% endblock %}
