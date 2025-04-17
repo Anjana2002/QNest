@@ -72,16 +72,7 @@ Materials{% endblock %} {% block content %}
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
-    function updateLabel(input, labelId) {
-      const label = document.getElementById(labelId);
-      const files = Array.from(input.files);
-      if (files.length > 0) {
-        const fileNames = files.map(file => file.name).join(", ");
-        label.textContent = fileNames;
-      } else {
-        label.textContent = "Choose PDF files";
-      }
-    }
+    
     function printQuestionPaper() {
       const questionContent =
         document.getElementById("question-paper").innerHTML;
