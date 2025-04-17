@@ -1,13 +1,9 @@
-{% extends "base.html" %}  
-
-{% load static %}
-{% block title %}Upload Exam Materials{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% load static %} {% block title %}Upload Exam
+Materials{% endblock %} {% block content %}
 
 <div class="upload-container">
   <h2>Upload Exam Materials</h2>
-  
+
   <form id="upload-form" method="POST" enctype="multipart/form-data">
     {% csrf_token %}
 
@@ -15,12 +11,12 @@
       <div class="form-group">
         <label>Select a Template:</label>
         <select name="template_id" required>
-          {% if templates %}
-            {% for template in templates %}
-              <option value="{{ template.id }}">{{ template.template_name }}</option>
-            {% endfor %}
-          {% else %}
-            <option value="" disabled>No templates available</option>
+          {% if templates %} {% for template in templates %}
+          <option value="{{ template.id }}">
+            {{ template.template_name }}
+          </option>
+          {% endfor %} {% else %}
+          <option value="" disabled>No templates available</option>
           {% endif %}
         </select>
       </div>
@@ -29,32 +25,39 @@
     <div class="form-section">
       <h2>Upload Study Materials</h2>
       <div class="form-group">
-        <label>Study Material PDF: <span style="color: red;">*</span></label>
-        <div class="file-input-wrapper">
-          <label class="file-input-label">Choose PDF files </label>
-          <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple />
-        </div>
+        <label for="study_material" >Study Material PDF: <span style="color: red">*</span></label>
+        <input
+          type="file"
+          id="study_material"
+          name="study_material"
+          accept="application/pdf"
+          required
+          multiple
+          onchange="updateLabel(this, 'study-material-label')"
+        />
       </div>
 
       <div class="form-group">
-        <label>Previous Question Paper PDF:</label>
-        <div class="file-input-wrapper">
-          <label class="file-input-label">Choose PDF files</label>
-          <input type="file" id="previous_question" name="previous_question" accept="application/pdf" multiple />
-        </div>
+        <label for="previous_question" >Previous Question Paper PDF:</label>
+        <input
+          type="file"
+          id="previous_question"
+          name="previous_question"
+          accept="application/pdf"
+          multiple
+          onchange="updateLabel(this, 'previous-question-label')"
+        />
       </div>
     </div>
 
-    <button type="submit" name="generate_question_paper">Generate Question Paper</button>
+    <button type="submit" name="generate_question_paper">
+      Generate Question Paper
+    </button>
   </form>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="error-message">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-
-  {% if generated_questions %}
+  {% if messages %} {% for message in messages %}
+  <div class="error-message">{{ message }}</div>
+  {% endfor %} {% endif %} {% if generated_questions %}
   <div class="question-paper">
     <h2>Generated Question Paper</h2>
     <div id="question-paper">
@@ -69,10 +72,23 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
+    function updateLabel(input, labelId) {
+      const label = document.getElementById(labelId);
+      const files = Array.from(input.files);
+      if (files.length > 0) {
+        const fileNames = files.map(file => file.name).join(", ");
+        label.textContent = fileNames;
+      } else {
+        label.textContent = "Choose PDF files";
+      }
+    }
     function printQuestionPaper() {
-      const questionContent = document.getElementById("question-paper").innerHTML;
+      const questionContent =
+        document.getElementById("question-paper").innerHTML;
       const printWindow = window.open("", "", "height=600,width=800");
-      printWindow.document.write("<html><head><title>Print Question Paper</title></head><body>");
+      printWindow.document.write(
+        "<html><head><title>Print Question Paper</title></head><body>"
+      );
       printWindow.document.write("<h2>Generated Question Paper</h2>");
       printWindow.document.write("<pre>" + questionContent + "</pre>");
       printWindow.document.write("</body></html>");

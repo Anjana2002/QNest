@@ -10,13 +10,13 @@ body {
   .upload-container,
   .register-container,
   .template-container {
-    margin-left: 250px; /* exactly the width of the sidebar */
+    margin-left: 250px; 
     padding: 30px;
     background: white;
     border-radius: 15px;
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-    width: calc(100% - 250px); /* take remaining width */
-    max-width: none; /* remove 800px max-width to prevent overflow */
+    width: calc(100% - 250px);
+    max-width: none; 
     box-sizing: border-box;
   }
   
