@@ -333,28 +333,37 @@ def mcq(request):
             if not study_text.strip():
                 return render(request, 'mcq.html', {'error': 'Failed to extract text from PDFs.'})
 
-            # Construct prompt
             prompt = f"""
-            You are an expert in creating university-level multiple choice questions (MCQs).
-            Generate {num_questions} high-quality MCQs based on the study material below.
-            
-            - Each question should have 4 options with one correct answer.
-            - First list all questions with their options.
-            - Then provide all correct answers together under a 'Key Answers' section.
-            
-            Format for Questions 
-            1. <Question>  
-            A) <Option 1>  
-            B) <Option 2>  
-            C) <Option 3>  
-            D) <Option 4>  
-            a line break then the next question
-            Study Material:
-            {study_text[:4000]}
-            """
+                        Generate exactly {num_questions} multiple choice questions based on the following study material.
+
+                        Each question must have:
+                        - A question number
+                        - 4 options labeled A to D
+                        - NO ANSWERS embedded with the questions
+
+                        After listing all questions, add a separate section titled `===ANSWER KEY===` with the correct options.
+
+                        Use the following format:
+
+                        1. [Question Text]
+                        A) Option A
+                        B) Option B
+                        C) Option C
+                        D) Option D
+
+                        ...
+
+                        ===ANSWER KEY===
+                        1. [correct option]
+                        2. [correct option]
+                        ...
+
+                        Study Material:
+                        {study_text[:4000]}
+                        """
 
             response = ollama.chat(
-                model="mistral",
+                model="qnest-tuned",
                 messages=[{"role": "user", "content": prompt}],
                 stream=False
             )
@@ -363,27 +372,78 @@ def mcq(request):
                 content = response['message']['content'].strip()
                 
                 # Split into questions and answers
-                if "Key Answers" in content:
-                    questions_part, answers_part = content.split("Key Answers", 1)
-                else:
-                    questions_part, answers_part = content, "No key answers found."
+                parts = content.split("===ANSWER KEY===")
+                questions_part = parts[0].strip()
+                answers_part = parts[1].strip() if len(parts) > 1 else ""
+                
+                # Process questions
+                questions = []
+                current_question = None
+                
+                import re
+                question_pattern = re.compile(r'^\s*(\d+)\.\s*(.*)')
+                option_pattern = re.compile(r'^\s*([A-D])\)\s*(.*)')
+                
+                for line in questions_part.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    # Check if this line is a new question
+                    question_match = question_pattern.match(line)
+                    if question_match:
+                        # Save the previous question if it exists
+                        if current_question:
+                            questions.append(current_question)
+                        
+                        # Extract question number and text
+                        number, text = question_match.groups()
+                        current_question = {
+                            'number': number.strip(),
+                            'text': text.strip(),
+                            'options': []
+                        }
+                    else:
+                        # Check if this line is an option
+                        option_match = option_pattern.match(line)
+                        if option_match and current_question:
+                            letter, text = option_match.groups()
+                            current_question['options'].append({
+                                'letter': letter.strip(),
+                                'text': text.strip()
+                            })
 
-                # Split into lists for better rendering
-                questions_list = [q.strip() for q in questions_part.split('\n') if q.strip()]
-                answers_list = [a.strip() for a in answers_part.split('\n') if a.strip()]
+                # Don't forget to add the last question
+                if current_question:
+                    questions.append(current_question)
+
+                # Process answers
+                answers = []
+                answer_pattern = re.compile(r'^\s*(\d+)\.\s*([A-D])')
+                
+                for line in answers_part.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
+                        
+                    match = answer_pattern.match(line)
+                    if match:
+                        number, answer = match.groups()
+                        answers.append({
+                            'number': number.strip(),
+                            'answer': answer.strip()
+                        })
 
                 return render(request, 'mcq.html', {
-                    'questions': questions_part.strip(),
-                    'key_answers': answers_part.strip(),
-                    'questions_list': questions_list,
-                    'answers_list': answers_list,
+                    'questions': questions,
+                    'answers': answers,
                     'success': True
                 })
 
-            return render(request, 'mcq.html', {'error': 'Unexpected response format from Ollama.'})
-
         except Exception as e:
+            import traceback
             print(f"Error during MCQ generation: {str(e)}")
+            print(traceback.format_exc())
             return render(request, 'mcq.html', {'error': f"An error occurred: {str(e)}"})
 
     return render(request, 'mcq.html')

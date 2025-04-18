@@ -1,80 +1,256 @@
 {% extends 'base.html' %}
-
 {% block title %}MCQ Generator{% endblock %}
 
 {% block content %}
-<h1>Multiple Choice Questions</h1>
-<h2>Upload Study Material </h2>
+<h1>Multiple Choice Questions Generator</h1>
+<h2>Upload Study Material</h2>
 
 <form id="upload-form" method="POST" enctype="multipart/form-data">
     {% csrf_token %}
     <label for="study_material">Study Material:</label>
     <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple><br><br>
     
-    <label for="q_no">Number of Questions :</label>
-    <input type="number" id="q_no" name="q_no" min="10" value="10"><br><br>
+    <label for="q_no">Number of Questions:</label>
+    <input type="number" id="q_no" name="q_no" min="1" value="10"><br><br>
     
     <button type="submit" name="generate_mcq">Generate MCQ</button>
 </form>
 
 {% if questions %}
-    <!-- Questions Section -->
-    <div id="question-section">
-        <h2>Generated MCQs</h2>
-        <div id="question-paper">
-            {% for question in questions_list %}
-                <p>{{ question }}</p>
-            {% endfor %}
+    <!-- Question Paper -->
+    <div id="question-paper" class="paper-container">
+        <div class="paper-header">
+            <h2 class="text-center">MCQ QUESTION PAPER</h2>
+            <div class="student-info">
+                <div class="info-item">
+                    <span class="label">Name:</span>
+                    <span class="underline">_____________________________</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Reg No:</span>
+                    <span class="underline">___________________________</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="questions-container">
+            <ol class="questions-list">
+                {% for question in questions %}
+                    <li class="question-item">
+                        <div class="question-text">{{ question.text }}</div>
+                        <ul class="options-list">
+                            {% for option in question.options %}
+                                <li class="option-item">{{ option.letter }}) {{ option.text }}</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endfor %}
+            </ol>
         </div>
     </div>
 
-    <!-- Answer Key Section -->
-    <div id="answer-section">
-        <h2>Key Answers</h2>
-        <div id="answer-key">
-            {% for answer in answers_list %}
-                <p>{{ answer }}</p>
-            {% endfor %}
-        </div>
-    </div>
     
-    <!-- Buttons for Printing and Downloading -->
-    <button type="button" onclick="printContent('question-paper', 'Generated Question Paper')">Print Question Paper</button>
-    <button type="button" onclick="printContent('answer-key', 'Answer Key')">Print Answer Key</button>
-    <button type="button" onclick="downloadPDF('question-paper', 'Generated_Question_Paper.pdf', 'Generated Question Paper')">Download Question Paper as PDF</button>
-    <button type="button" onclick="downloadPDF('answer-key', 'Answer_Key.pdf', 'Answer Key')">Download Answer Key as PDF</button>
+    <div id="answer-key" class="paper-container">
+        <h2 class="text-center">ANSWER KEY</h2>
+        <table class="answer-table">
+            <thead>
+                <tr>
+                    <th>Question No.</th>
+                    <th>Correct Answer</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for answer in answers %}
+                    <tr>
+                        <td>{{ answer.number }}</td>
+                        <td>{{ answer.answer }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Buttons -->
+    <div class="action-buttons">
+        <button type="button" onclick="printContent('question-paper')">Print Question Paper</button>
+        <button type="button" onclick="printContent('answer-key')">Print Answer Key</button>
+        <button type="button" onclick="downloadPDF('question-paper', 'MCQ_Question_Paper.pdf')">Download Question Paper</button>
+        <button type="button" onclick="downloadPDF('answer-key', 'Answer_Key.pdf')">Download Answer Key</button>
+    </div>
 {% elif error %}
-    <p style="color:red;">{{ error }}</p>
+    <p class="error-message">{{ error }}</p>
 {% endif %}
 
-<!-- Import jsPDF -->
+<style>
+    .paper-container {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 20px auto;
+        padding: 20mm;
+        background: white;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        box-sizing: border-box;
+        font-family: "Times New Roman", serif;
+        font-size: 12pt;
+        line-height: 1.5;
+    }
+
+    .text-center { text-align: center; }
+
+    .student-info {
+        display: flex;
+        justify-content: space-between;
+        margin: 20px 0 40px 0;
+    }
+
+    .label { margin-right: 5px; }
+    .underline {
+        border-bottom: 1px solid black;
+        min-width: 150px;
+        display: inline-block;
+    }
+
+    .questions-list {
+        list-style-type: decimal;
+        padding-left: 20px;
+    }
+
+    .question-item {
+        margin-bottom: 15px;
+        page-break-inside: avoid;
+    }
+
+    .question-text {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .options-list {
+        list-style-type: none;
+        padding-left: 30px;
+        margin-top: 5px;
+    }
+
+    .option-item { margin-bottom: 5px; }
+
+    .answer-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    .answer-table th, .answer-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+    }
+
+    .answer-table th { background-color: #f2f2f2; }
+
+    .action-buttons {
+        text-align: center;
+        margin: 20px 0;
+    }
+
+    .action-buttons button {
+        margin: 0 10px;
+        padding: 8px 15px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .action-buttons button:hover {
+        background-color: #45a049;
+    }
+
+    .error-message {
+        color: red;
+        text-align: center;
+        margin: 20px 0;
+    }
+
+    @media print {
+        body * { visibility: hidden; }
+        .paper-container, .paper-container * { visibility: visible; }
+        .paper-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 20mm;
+            box-shadow: none;
+        }
+        .action-buttons { display: none; }
+    }
+</style>
+
+<!-- jsPDF & html2canvas -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
     const { jsPDF } = window.jspdf;
 
-    // Print Function
-    function printContent(elementId, title) {
+    function printContent(elementId) {
         const content = document.getElementById(elementId).innerHTML;
         const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write('<html><head><title>' + title + '</title></head><body>');
-        printWindow.document.write('<h2>' + title + '</h2>');
+        printWindow.document.write('<html><head><title>Print</title>');
+        printWindow.document.write('<style>' + document.querySelector('style').innerHTML + '</style>');
+        printWindow.document.write('</head><body>');
+        printWindow.document.write('<div class="paper-container">');
         printWindow.document.write(content);
+        printWindow.document.write('</div>');
         printWindow.document.write('</body></html>');
         printWindow.document.close();
-        printWindow.print();
+        setTimeout(() => {
+            printWindow.print();
+        }, 500);
     }
-    
-    // Download PDF Function
-    async function downloadPDF(elementId, fileName, title) {
-        const doc = new jsPDF();
-        const content = document.getElementById(elementId).innerText;
-        const lines = doc.splitTextToSize(content, 180);
-        doc.setFontSize(12);
-        doc.text(title, 10, 10);
-        doc.text(lines, 10, 20);
 
-        doc.save(fileName);
+    function downloadPDF(elementId, fileName) {
+        const element = document.getElementById(elementId);
+        
+        // Set display options for better rendering
+        const originalStyle = element.style.display;
+        element.style.display = 'block';
+        
+        html2canvas(element, {
+            scale: 2,
+            logging: false,
+            useCORS: true,
+            allowTaint: true
+        }).then(canvas => {
+            // Restore original style
+            element.style.display = originalStyle;
+            
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = pageWidth;
+            const imgHeight = canvas.height * imgWidth / canvas.width;
+            
+            let heightLeft = imgHeight;
+            let position = 0;
+            
+            // First page
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+            
+            // Additional pages if needed
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+            
+            pdf.save(fileName);
+        });
     }
 </script>
-
-{% endblock %}  
+{% endblock %}
