@@ -258,20 +258,20 @@ You are an expert university professor creating exam papers. Generate a question
    - Include all specified section instructions
    - Preserve all template placeholders (Name, Reg No, etc.)
 
-### 📝 TEMPLATE DETAILS (MUST INCLUDE VERBATIM):
+###  TEMPLATE DETAILS (MUST INCLUDE VERBATIM):
 Exam Title: {template.exam_title}
 Course Code: {template.course_code}
 Course Name: {template.course_name}
 Time Duration: {template.time_duration}
 Max Marks: {template.max_marks}
 
-### 📑 SECTION STRUCTURE (FOLLOW EXACTLY):
+###  SECTION STRUCTURE (FOLLOW EXACTLY):
 {sections_formatted}
 
-### 📚 STUDY MATERIAL CONTENT (Base questions on this):
+### STUDY MATERIAL CONTENT (Base questions on this):
 {study_text[:10000]}  [First 10,000 characters]
 
-### 🚫 PREVIOUS QUESTIONS TO AVOID (If provided):
+###  PREVIOUS QUESTIONS TO AVOID (If provided):
 {prev_text[:2000] if prev_text else "N/A"}
 
 ### ✏️ REQUIRED OUTPUT FORMAT:
@@ -291,7 +291,7 @@ Max Marks: {template.max_marks}
 {formatted_sections_output}
 [END OF FORMAT]
 
-### ✅ FINAL CHECK:
+### FINAL CHECK:
 Before responding, verify:
 1. All sections are present in correct order
 2. Exact question counts per section
