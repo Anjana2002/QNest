@@ -10,6 +10,14 @@ from PyPDF2 import PdfReader
 import ollama
 from django.contrib import messages
 import re
+from django.conf import settings
+
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_protect
+from django.template.loader import render_to_string
+from django.http import HttpResponse, JsonResponse
+from django.contrib import messages
+import subprocess, tempfile, os
 
 
 def home(request):
@@ -188,16 +196,11 @@ def create_template(request):
 
 
 
-
 @login_required
 @csrf_protect
 def upload_files(request):
     if request.method == "POST":
-        print("Received POST request:", request.POST)  
-
         if "generate_question_paper" in request.POST:
-            print("Generating question paper...")
-
             template_id = request.POST.get("template_id")
             try:
                 template = Template.objects.get(id=template_id, user=request.user)
@@ -208,113 +211,97 @@ def upload_files(request):
             if not study_materials:
                 return JsonResponse({"error": "Study material is required."}, status=400)
 
-            study_texts = [extract_text_from_pdf(pdf) for pdf in study_materials]
+            # Extract text from study materials
+            study_texts = []
+            for pdf in study_materials:
+                try:
+                    text = extract_text_from_pdf(pdf)
+                    if text.strip():
+                        study_texts.append(text)
+                except Exception as e:
+                    print(f"Error extracting text from PDF: {e}")
+            
+            if not study_texts:
+                return JsonResponse({"error": "Study material text extraction failed."}, status=400)
+            
             study_text = "\n\n".join(study_texts)
 
-            if not study_text.strip():
-                return JsonResponse({"error": "Study material text extraction failed."}, status=400)
-
-            prev_texts = [extract_text_from_pdf(pdf) for pdf in request.FILES.getlist("previous_question", [])]
+            # Process previous questions if provided
+            prev_texts = []
+            for pdf in request.FILES.getlist("previous_question", []):
+                try:
+                    text = extract_text_from_pdf(pdf)
+                    if text.strip():
+                        prev_texts.append(text)
+                except Exception as e:
+                    print(f"Error extracting text from previous questions PDF: {e}")
             prev_text = "\n\n".join(prev_texts) if prev_texts else ""
 
-            prev_qstn_text = f"### **Previous Exam Paper (Use as Reference, Do NOT Repeat Questions):**\n{prev_text[:4000]}" if prev_text else ""
-
-            # Updated to use 'total_questions' instead of 'questions'
-            sections_formatted = "\n".join([
-                f"### Section: {section['section_name']}\n"
-                f"Number of Questions: {section['total_questions']}\n"
-                f"Marks per Question: {section['marks_per_question']}\n"
-                f"Instructions: {section['instructions']}\n"
-                for section in template.sections
-            ])
-
-            # Updated to use 'total_questions' instead of 'questions'
-            formatted_sections_output = ''.join(
-                f"### {section['section_name'].upper()}\n"
-                f"{section['instructions']}\n\n" +
-                '\n'.join(f"Q{i+1}. [Generated question here]" for i in range(section['total_questions'])) +
-                "\n\n"
+            sections_prompt = "\n".join(
+                f"""
+                === EXAMPLE FORMAT FOR {section['section_name'].upper()} ===
+                PART-{section['section_name'].upper()}
+                Answer all the questions.
+                Each carries {section['marks_per_question']} mark(s).
+                
+                [EXACTLY {section['total_questions']} QUESTIONS SHOULD APPEAR HERE]
+                """
                 for section in template.sections
             )
 
+            # Final prompt with stricter formatting instructions
             prompt = f"""
-You are an expert university professor creating exam papers. Generate a question paper that EXACTLY matches the provided template structure.
+            Generate a question paper with EXACTLY this format for each section:
 
-### 🔹 STRICT REQUIREMENTS:
-1. PRESERVE THE TEMPLATE STRUCTURE:
-   - Maintain the exact number of sections in the given order
-   - Each section must have precisely the specified number of questions
-   - Never modify marks distribution or total marks
+            FOR EACH SECTION YOU MUST INCLUDE:
+            1. NEVER include chapter names/titles in question
+            2. Section header as "PART-[LETTER]" (e.g., "PART-A")
+            3. IMMEDIATELY FOLLOWED BY these two lines:
+               - "Answer all the questions."
+               - "Each carries [X] mark(s)."
+            4. Then exactly [N] numbered questions (1., 2., 3., etc.)
+            
+            THIS IS NON-NEGOTIABLE FORMATTING. DO NOT OMIT ANY OF THESE LINES.
+            
+            STUDY MATERIAL:
+            {study_text[:10000]}
 
-2. QUESTION GENERATION RULES:
-   - Create ORIGINAL questions based on the study material
-   - NEVER copy questions from previous papers (if provided)
-   - Ensure appropriate difficulty for university-level exams
-   - Questions should cover different aspects of the study material
+            PREVIOUS QUESTIONS TO AVOID:
+            {prev_text[:2000] if prev_text else "NONE"}
 
-3. FORMATTING:
-   - Use the EXACT header format shown below
-   - Maintain consistent numbering (Q1, Q2, etc.)
-   - Include all specified section instructions
-   - Preserve all template placeholders (Name, Reg No, etc.)
+            REQUIRED SECTION FORMATS:
+            {sections_prompt}
 
-###  TEMPLATE DETAILS (MUST INCLUDE VERBATIM):
-Exam Title: {template.exam_title}
-Course Code: {template.course_code}
-Course Name: {template.course_name}
-Time Duration: {template.time_duration}
-Max Marks: {template.max_marks}
-
-###  SECTION STRUCTURE (FOLLOW EXACTLY):
-{sections_formatted}
-
-### STUDY MATERIAL CONTENT (Base questions on this):
-{study_text[:10000]}  [First 10,000 characters]
-
-###  PREVIOUS QUESTIONS TO AVOID (If provided):
-{prev_text[:2000] if prev_text else "N/A"}
-
-### ✏️ REQUIRED OUTPUT FORMAT:
-
-[START OF FORMAT]
-Name: ________________
-Reg No: ________________
-
-{template.exam_title.upper()}
-Course Code: {template.course_code}
-Course Name: {template.course_name}
-Time Duration: {template.time_duration}
-Max Marks: {template.max_marks}
-
----
-
-{formatted_sections_output}
-[END OF FORMAT]
-
-### FINAL CHECK:
-Before responding, verify:
-1. All sections are present in correct order
-2. Exact question counts per section
-3. No duplication from previous papers
-4. Proper formatting maintained
-5. All template fields included verbatim
-"""
-
-            print(prompt)
-
+            YOUR OUTPUT MUST:
+            - Start each section with PART-[LETTER]
+            - Include BOTH mandatory lines after each section header
+            - Include exactly the specified number of questions
+            - Number all questions (1., 2., etc.)
+            - NOT add any extra text or comments
+            """
             try:
-                response = ollama.chat(model="mistral", messages=[{"role": "user", "content": prompt}])
-
-                if "message" not in response or "content" not in response["message"]:
-                    messages.error(request, "Invalid response from the model.")
-                    return redirect('upload')
+                response = ollama.chat(
+                    model="mistral",
+                    messages=[
+                        {
+                            "role": "system", 
+                            "content": "You must format exam papers EXACTLY as specified. Never omit required lines."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    options={
+                        'temperature': 0.2,  # Lower for more consistent formatting
+                        'repeat_penalty': 1.2  # Helps prevent omission of required lines
+                    }
+                )
 
                 questions = response["message"]["content"].strip()
-                if not questions:
-                    messages.error(request, "Question generation failed. No response from the model.")
-                    return redirect('upload')
+                request.session["last_generated_questions"] = questions
+                request.session["last_template_id"] = template_id
 
-                messages.success(request, "Question paper generated successfully!")
                 return render(request, "upload.html", {
                     "templates": Template.objects.filter(user=request.user).order_by("id"),
                     "generated_questions": questions,
@@ -322,12 +309,97 @@ Before responding, verify:
                 })
 
             except Exception as e:
-                print("Error calling Ollama:", str(e))
-                messages.error(request, f"Ollama request failed: {str(e)}")
-                return redirect('upload')
+                messages.error(request, f"Error generating question paper: {e}")
+                return redirect("upload_files")
 
-    templates = Template.objects.filter(user=request.user).order_by("id") 
+    templates = Template.objects.filter(user=request.user).order_by("id")
     return render(request, "upload.html", {"templates": templates})
+
+def escape_latex(text):
+    """Escape special LaTeX characters with proper handling for line breaks"""
+    if not text:
+        return ""
+    
+    replacements = [
+        ('\\', r'\textbackslash{}'),
+        ('&', r'\&'),
+        ('%', r'\%'),
+        ('$', r'\$'),
+        ('#', r'\#'),
+        ('_', r'\_'),
+        ('{', r'\{'),
+        ('}', r'\}'),
+        ('~', r'\textasciitilde{}'),
+        ('^', r'\^{}'),
+        ('\n', r'\\' + '\n'),  # Proper LaTeX line breaks
+    ]
+    
+    for orig, repl in replacements:
+        text = text.replace(orig, repl)
+    return text
+    
+@login_required
+def download_generated_pdf(request):
+    questions = request.session.get("last_generated_questions")
+    template_id = request.session.get("last_template_id")
+
+    if not questions or not template_id:
+        return HttpResponse("No question paper found. Please generate one first.", status=400)
+
+    try:
+        template = Template.objects.get(id=template_id, user=request.user)
+    except Template.DoesNotExist:
+        return HttpResponse("Invalid template.", status=400)
+
+    # Enhanced LaTeX escaping with section preservation
+    escaped_questions = escape_latex(questions)
+    
+    # Ensure consistent line breaks for LaTeX
+    escaped_questions = re.sub(r'(?<!\\)\\\n', r'\\ \n', escaped_questions)  # Ensure proper line breaks
+    
+    latex_context = {
+        "exam_title": escape_latex(template.exam_title),
+        "course_code": escape_latex(template.course_code),
+        "course_name": escape_latex(template.course_name),
+        "time_duration": escape_latex(template.time_duration),
+        "max_marks": escape_latex(str(template.max_marks)),
+        "questions": escaped_questions,
+        "font_size": getattr(settings, 'LATEX_FONT_SIZE', '12pt'),
+    }
+
+    latex_string = render_to_string("question_template.tex", latex_context)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Write LaTeX source
+        tex_path = os.path.join(tmpdir, "paper.tex")
+        with open(tex_path, "w", encoding='utf-8') as f:
+            f.write(latex_string)
+
+        # Compile LaTeX (run twice for proper TOC/references)
+        try:
+            latex_cmd = ["pdflatex", "-interaction=nonstopmode", "-output-directory", tmpdir, tex_path]
+            subprocess.run(latex_cmd, cwd=tmpdir, check=True, timeout=30)
+            subprocess.run(latex_cmd, cwd=tmpdir, check=True, timeout=30)  # Second run for references
+        except subprocess.CalledProcessError as e:
+            error_log = os.path.join(tmpdir, "paper.log")
+            if os.path.exists(error_log):
+                with open(error_log, 'r', encoding='utf-8') as log_file:
+                    error_details = log_file.read()[-2000:]  # Get last part of log
+            else:
+                error_details = str(e)
+            return HttpResponse(f"LaTeX compilation failed: {error_details}", status=500)
+        except subprocess.TimeoutExpired:
+            return HttpResponse("LaTeX compilation timed out.", status=500)
+
+        # Return generated PDF
+        pdf_path = os.path.join(tmpdir, "paper.pdf")
+        if os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                response = HttpResponse(f.read(), content_type="application/pdf")
+                response["Content-Disposition"] = f'attachment; filename="{escape_latex(template.exam_title)}.pdf"'
+                return response
+        return HttpResponse("PDF generation failed.", status=500)
+
 
 
 

@@ -1,5 +1,7 @@
-{% extends "base.html" %} {% load static %} {% block title %}Upload Exam
-Materials{% endblock %} {% block content %}
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Upload Exam Materials{% endblock %}
+{% block content %}
 
 <div class="upload-container">
   <h2>Upload Exam Materials</h2>
@@ -11,12 +13,14 @@ Materials{% endblock %} {% block content %}
       <div class="form-group">
         <label>Select a Template:</label>
         <select name="template_id" required>
-          {% if templates %} {% for template in templates %}
-          <option value="{{ template.id }}">
-            {{ template.template_name }}
-          </option>
-          {% endfor %} {% else %}
-          <option value="" disabled>No templates available</option>
+          {% if templates %}
+            {% for template in templates %}
+              <option value="{{ template.id }}" {% if template.id|stringformat:"s" == template_id|stringformat:"s" %}selected{% endif %}>
+                {{ template.template_name }}
+              </option>
+            {% endfor %}
+          {% else %}
+            <option value="" disabled>No templates available</option>
           {% endif %}
         </select>
       </div>
@@ -25,78 +29,40 @@ Materials{% endblock %} {% block content %}
     <div class="form-section">
       <h2>Upload Study Materials</h2>
       <div class="form-group">
-        <label for="study_material" >Study Material PDF: <span style="color: red">*</span></label>
-        <input
-          type="file"
-          id="study_material"
-          name="study_material"
-          accept="application/pdf"
-          required
-          multiple
-          onchange="updateLabel(this, 'study-material-label')"
-        />
+        <label for="study_material">Study Material PDF: <span style="color: red">*</span></label>
+        <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple />
       </div>
 
       <div class="form-group">
-        <label for="previous_question" >Previous Question Paper PDF:</label>
-        <input
-          type="file"
-          id="previous_question"
-          name="previous_question"
-          accept="application/pdf"
-          multiple
-          onchange="updateLabel(this, 'previous-question-label')"
-        />
+        <label for="previous_question">Previous Question Paper PDF:</label>
+        <input type="file" id="previous_question" name="previous_question" accept="application/pdf" multiple />
       </div>
     </div>
 
-    <button type="submit" name="generate_question_paper">
-      Generate Question Paper
-    </button>
+    <button type="submit" name="generate_question_paper">Generate Question Paper</button>
   </form>
 
-  {% if messages %} {% for message in messages %}
-  <div class="error-message">{{ message }}</div>
-  {% endfor %} {% endif %} {% if generated_questions %}
+  {% if messages %}
+    {% for message in messages %}
+      <div class="error-message">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if generated_questions %}
   <div class="question-paper">
     <h2>Generated Question Paper</h2>
-    <div id="question-paper">
-      <pre>{{ generated_questions }}</pre>
+    <div id="question-paper" style="white-space: pre-wrap; font-family: monospace; border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem;">
+      {{ generated_questions }}
     </div>
-
-    <div class="action-buttons">
-      <button type="button" onclick="printQuestionPaper()">Print</button>
-      <button type="button" onclick="downloadAsPDF()">Download as PDF</button>
+  
+    <div class="action-buttons" style="margin-top: 1rem;">
+      <a href="{% url 'download_generated_pdf' %}">
+        <button type="button">Download as PDF (LaTeX)</button>
+      </a>
     </div>
   </div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script>
-    
-    function printQuestionPaper() {
-      const questionContent =
-        document.getElementById("question-paper").innerHTML;
-      const printWindow = window.open("", "", "height=600,width=800");
-      printWindow.document.write(
-        "<html><head><title>Print Question Paper</title></head><body>"
-      );
-      printWindow.document.write("<h2>Generated Question Paper</h2>");
-      printWindow.document.write("<pre>" + questionContent + "</pre>");
-      printWindow.document.write("</body></html>");
-      printWindow.document.close();
-      printWindow.print();
-    }
-
-    async function downloadAsPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const questionText = document.getElementById("question-paper").innerText;
-      const lines = doc.splitTextToSize(questionText, 180);
-      doc.setFontSize(12);
-      doc.text(lines, 10, 10);
-      doc.save("Generated_Question_Paper.pdf");
-    }
-  </script>
+  
   {% endif %}
 </div>
+
 {% endblock %}
