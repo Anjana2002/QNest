@@ -1,6 +1,10 @@
-{% extends "base.html" %} {% load static %} {% block title %} Create Exam
-Template {% endblock %} {% block content %}
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Create Exam Template{% endblock %}
+
+{% block content %}
 <link rel="stylesheet" href="{% static 'css/template.css' %}" />
+
 <div class="template-container">
   <h2>Create Exam Template</h2>
 
@@ -42,6 +46,7 @@ Template {% endblock %} {% block content %}
     <button type="button" id="add-section-btn">Add Section</button>
 
     <div id="total-marks-display">Total Marks: 0</div>
+    <div id="marks-message" class="error-message"></div>
 
     <button type="submit">Save Template</button>
   </form>
@@ -53,61 +58,60 @@ Template {% endblock %} {% block content %}
     const form = document.getElementById("template-form");
     const maxMarksInput = document.getElementById("max_marks");
     const totalMarksDisplay = document.getElementById("total-marks-display");
-
-    if (addSectionBtn) {
-      addSectionBtn.addEventListener("click", addSection);
-    }
+    const marksMessage = document.getElementById("marks-message");
 
     // Add first section by default
     addSection();
 
-    function updateTotalMarks() {
-      let total = 0;
-      const sectionItems = document.querySelectorAll(".section-item");
+    function validateInstruction(instruction, numQuestions) {
+      instruction = instruction.toLowerCase().trim();
+      
+      if (instruction.startsWith("answer all")) {
+        return { valid: true, count: numQuestions };
+      }
+      else if (instruction.startsWith("answer only")) {
+        const parts = instruction.split(" ");
+        if (parts.length === 3 && !isNaN(parts[2])) {
+          const count = parseInt(parts[2]);
+          return { 
+            valid: count <= numQuestions, 
+            count: Math.min(count, numQuestions) 
+          };
+        }
+      }
+      return { valid: false, count: 0 };
+    }
 
-      sectionItems.forEach((section) => {
-        const numQuestions =
-          parseInt(section.querySelector("[name='num_questions[]']").value) ||
-          0;
-        const marksPerQuestion =
-          parseInt(
-            section.querySelector("[name='marks_per_question[]']").value
-          ) || 0;
-        total += numQuestions * marksPerQuestion;
+    function calculateTotalMarks() {
+      let total = 0;
+      let allValid = true;
+      marksMessage.textContent = "";
+      
+      document.querySelectorAll(".section-item").forEach(section => {
+        const numQuestions = parseInt(section.querySelector("[name='num_questions[]']").value) || 0;
+        const marksPerQuestion = parseInt(section.querySelector("[name='marks_per_question[]']").value) || 0;
+        const instruction = section.querySelector("[name='instructions[]']").value;
+        
+        const validation = validateInstruction(instruction, numQuestions);
+        const errorEl = section.querySelector(".instruction-error");
+        
+        if (!validation.valid) {
+          errorEl.style.display = "block";
+          allValid = false;
+          marksMessage.textContent = "Fix all instructions before submitting";
+        } else {
+          errorEl.style.display = "none";
+          total += validation.count * marksPerQuestion;
+        }
       });
 
       totalMarksDisplay.textContent = `Total Marks: ${total}`;
-      return total;
-    }
-
-    function validateInstructions(instructionInput) {
-      let instruction = instructionInput.value.toLowerCase().trim();
-      if (instruction.startsWith("answer all")) {
-        return true;
-      }
-      if (instruction.startsWith("answer only")) {
-        const parts = instruction.split(" ");
-        if (parts.length === 3 && !isNaN(parts[2])) {
-          const answerOnly = parseInt(parts[2]);
-          const numQuestions = parseInt(
-            instructionInput
-              .closest(".section-item")
-              .querySelector("[name='num_questions[]']").value
-          );
-          return answerOnly <= numQuestions;
-        }
-      }
-      return false;
+      return { total, allValid };
     }
 
     function addSection() {
-      let sectionsContainer = document.getElementById("sections-container");
-      let sectionId = Date.now();
-
-      let sectionDiv = document.createElement("div");
-      sectionDiv.classList.add("section-item");
-      sectionDiv.dataset.id = sectionId;
-
+      const sectionDiv = document.createElement("div");
+      sectionDiv.className = "section-item";
       sectionDiv.innerHTML = `
         <div class="form-group">
           <label>Section Name:</label>
@@ -125,87 +129,50 @@ Template {% endblock %} {% block content %}
         </div>
 
         <div class="form-group">
-          <label>Instructions (e.g., "Answer all" or "Answer only 4"):</label>
+          <label>Instructions:</label>
           <input type="text" name="instructions[]" required 
                  placeholder="Answer all or Answer only X">
-          <span class="instruction-error">Must be "Answer all" or "Answer only X" where X ≤ questions</span>
+          <span class="instruction-error">
+            Must be "Answer all" or "Answer only X" where X ≤ questions
+          </span>
         </div>
 
         <button type="button" class="remove-section-btn">Remove Section</button>
       `;
 
-      sectionsContainer.appendChild(sectionDiv);
+      document.getElementById("sections-container").appendChild(sectionDiv);
 
-      // Add event listeners for dynamic validation
-      const inputs = sectionDiv.querySelectorAll("input");
-      inputs.forEach((input) => {
-        input.addEventListener("change", function () {
-          updateTotalMarks();
+      // Set initial error state to hidden
+      sectionDiv.querySelector(".instruction-error").style.display = "none";
 
-          // Validate instructions when they change
-          if (input.name === "instructions[]") {
-            const isValid = validateInstructions(input);
-            const errorSpan = input
-              .closest(".section-item")
-              .querySelector(".instruction-error");
-            errorSpan.style.display = isValid ? "none" : "block";
-          }
-
-          // Validate num_questions vs instructions when questions change
-          if (input.name === "num_questions[]") {
-            const instructionInput = input
-              .closest(".section-item")
-              .querySelector("[name='instructions[]']");
-            const isValid = validateInstructions(instructionInput);
-            const errorSpan = input
-              .closest(".section-item")
-              .querySelector(".instruction-error");
-            errorSpan.style.display = isValid ? "none" : "block";
-          }
-        });
+      // Add event listeners
+      sectionDiv.querySelectorAll("input").forEach(input => {
+        input.addEventListener("input", () => calculateTotalMarks());
       });
 
-      sectionDiv
-        .querySelector(".remove-section-btn")
-        .addEventListener("click", function () {
-          sectionDiv.remove();
-          updateTotalMarks();
-        });
+      sectionDiv.querySelector(".remove-section-btn").addEventListener("click", () => {
+        sectionDiv.remove();
+        calculateTotalMarks();
+      });
     }
 
-    // Form submission validation
-    form.addEventListener("submit", function (e) {
+    form.addEventListener("submit", function(e) {
       const maxMarks = parseInt(maxMarksInput.value);
-      const totalMarks = updateTotalMarks();
+      const { total, allValid } = calculateTotalMarks();
 
-      // Validate total marks vs max marks
-      if (totalMarks !== maxMarks) {
-        alert(
-          `Total section marks (${totalMarks}) don't match max marks (${maxMarks})`
-        );
+      if (!allValid) {
         e.preventDefault();
+        marksMessage.textContent = "Please fix all instruction fields";
         return;
       }
 
-      // Validate all instructions
-      let allInstructionsValid = true;
-      document.querySelectorAll("[name='instructions[]']").forEach((input) => {
-        if (!validateInstructions(input)) {
-          allInstructionsValid = false;
-          const errorSpan = input
-            .closest(".section-item")
-            .querySelector(".instruction-error");
-          errorSpan.style.display = "block";
-        }
-      });
-
-      if (!allInstructionsValid) {
-        alert(
-          "Please fix all instruction fields. They must be 'Answer all' or 'Answer only X' where X ≤ number of questions."
-        );
+      if (total !== maxMarks) {
         e.preventDefault();
+        marksMessage.textContent = `Total marks (${total}) must match max marks (${maxMarks})`;
       }
     });
+
+    addSectionBtn.addEventListener("click", addSection);
   });
 </script>
 {% endblock %}

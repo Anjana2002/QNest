@@ -68,13 +68,12 @@ def extract_text_from_pdf(pdf):
 @login_required
 @csrf_protect
 def create_template(request):
-    """Handles template creation and saves it to the database."""
-    
     if request.method == "GET":
         return render(request, "create_template.html")
 
     if request.method == "POST":
         try:
+            # Get basic template info
             template_name = request.POST.get("template_name", "").strip()
             exam_title = request.POST.get("exam_title", "").strip()
             course_code = request.POST.get("course_code", "").strip()
@@ -82,88 +81,92 @@ def create_template(request):
             time_duration = request.POST.get("time_duration", "").strip()
             max_marks = request.POST.get("max_marks", "0").strip()
 
-            # Ensure required fields are present
-            if not template_name or not exam_title or not course_code or not course_name or not time_duration:
-                return JsonResponse({"error": "All fields are required"}, status=400)
+            # Validate required fields
+            if not all([template_name, exam_title, course_code, course_name, time_duration]):
+                messages.error(request, "All fields are required")
+                return redirect("create_template")
 
-            # Convert max_marks safely
             try:
                 max_marks = int(max_marks)
                 if max_marks <= 0:
-                    return JsonResponse({"error": "Max marks must be positive"}, status=400)
+                    messages.error(request, "Max marks must be positive")
+                    return redirect("create_template")
             except ValueError:
-                return JsonResponse({"error": "Invalid max marks value"}, status=400)
+                messages.error(request, "Invalid max marks value")
+                return redirect("create_template")
 
-            # Extract and validate sections
-            sections = []
+            # Process sections
             section_names = request.POST.getlist("section_name[]")
             num_questions = request.POST.getlist("num_questions[]")
             marks_per_question = request.POST.getlist("marks_per_question[]")
             instructions = request.POST.getlist("instructions[]")
 
             if not section_names:
-                return JsonResponse({"error": "At least one section is required"}, status=400)
+                messages.error(request, "At least one section is required")
+                return redirect("create_template")
 
             total_marks = 0
-            
+            sections = []
+            has_errors = False
+
             for i in range(len(section_names)):
                 try:
+                    # Get section data
                     section_name = section_names[i].strip()
                     questions = int(num_questions[i])
                     marks = int(marks_per_question[i])
                     instruction = instructions[i].strip().lower()
-                    
-                    if not section_name:
-                        return JsonResponse({"error": "Section name is required"}, status=400)
-                    if questions <= 0:
-                        return JsonResponse({"error": "Number of questions must be positive"}, status=400)
-                    if marks <= 0:
-                        return JsonResponse({"error": "Marks per question must be positive"}, status=400)
-                    
-                    # Validate instruction format
-                    if not (instruction.startswith("answer all") or 
-                           instruction.startswith("answer only")):
-                        return JsonResponse({
-                            "error": "Instructions must start with 'Answer all' or 'Answer only X'"
-                        }, status=400)
-                    
-                    # If "answer only X", validate X <= total questions
+
+                    # Validate basic fields
+                    if not section_name or questions <= 0 or marks <= 0:
+                        has_errors = True
+                        break
+
+                    # Validate instruction and calculate counted questions
                     if instruction.startswith("answer only"):
                         try:
                             answer_only = int(instruction.split(" ")[2])
                             if answer_only > questions:
-                                return JsonResponse({
-                                    "error": f"Answer only count ({answer_only}) cannot exceed questions in section ({questions})"
-                                }, status=400)
+                                has_errors = True
+                                break
+                            counted_questions = answer_only
                         except (IndexError, ValueError):
-                            return JsonResponse({
-                                "error": "Invalid 'Answer only' format. Use 'Answer only X' where X is a number"
-                            }, status=400)
-                    
-                    section_marks = questions * marks
+                            has_errors = True
+                            break
+                    elif instruction.startswith("answer all"):
+                        counted_questions = questions
+                    else:
+                        has_errors = True
+                        break
+
+                    # Calculate section marks
+                    section_marks = counted_questions * marks
                     total_marks += section_marks
-                    
+
                     sections.append({
                         "section_name": section_name,
-                        "questions": questions,
+                        "total_questions": questions,
                         "marks_per_question": marks,
                         "instructions": instruction,
+                        "counted_questions": counted_questions,
                         "section_marks": section_marks
                     })
-                
-                except IndexError:
-                    return JsonResponse({"error": "Incomplete section data"}, status=400)
-                except ValueError as ve:
-                    return JsonResponse({"error": f"Invalid section data: {str(ve)}"}, status=400)
 
-            # Validate total marks matches max marks
+                except Exception:
+                    has_errors = True
+                    break
+
+            if has_errors:
+                messages.error(request, "Invalid section data or instructions")
+                return redirect("create_template")
+
             if total_marks != max_marks:
-                return JsonResponse({
-                    "error": f"Total section marks ({total_marks}) don't match max marks ({max_marks})"
-                }, status=400)
+                messages.error(request, 
+                    f"Calculated marks ({total_marks}) don't match max marks ({max_marks})")
+                return redirect("create_template")
 
-            # Save template to DB
-            template = Template.objects.create(
+            # Save template
+            Template.objects.create(
                 user=request.user,
                 template_name=template_name,
                 exam_title=exam_title,
@@ -174,13 +177,16 @@ def create_template(request):
                 sections=sections
             )
 
-            messages.success(request, "Template saved successfully!")
-            return redirect("upload_files")  
+            messages.success(request, "Template created successfully!")
+            return redirect("upload_files")
 
         except Exception as e:
-            return JsonResponse({"error": f"Error saving template: {str(e)}"}, status=500)
+            messages.error(request, f"Error creating template: {str(e)}")
+            return redirect("create_template")
 
-    return JsonResponse({"error": "Invalid request method."}, status=400)
+    return redirect("create_template")
+
+
 
 
 @login_required
@@ -189,19 +195,15 @@ def upload_files(request):
     if request.method == "POST":
         print("Received POST request:", request.POST)  
 
-        # ✅ Handle Question Paper Generation
         if "generate_question_paper" in request.POST:
-            print("Generating question paper...")  # Debugging
+            print("Generating question paper...")
 
             template_id = request.POST.get("template_id")
-            
-            # Validate template selection
             try:
                 template = Template.objects.get(id=template_id, user=request.user)
             except Template.DoesNotExist:
                 return JsonResponse({"error": "Invalid template selected."}, status=400)
 
-            # Extract study material (Mandatory)
             study_materials = request.FILES.getlist("study_material")
             if not study_materials:
                 return JsonResponse({"error": "Study material is required."}, status=400)
@@ -212,14 +214,11 @@ def upload_files(request):
             if not study_text.strip():
                 return JsonResponse({"error": "Study material text extraction failed."}, status=400)
 
-            
             prev_texts = [extract_text_from_pdf(pdf) for pdf in request.FILES.getlist("previous_question", [])]
             prev_text = "\n\n".join(prev_texts) if prev_texts else ""
 
-            # ✅ Construct the prompt
             prev_qstn_text = f"### **Previous Exam Paper (Use as Reference, Do NOT Repeat Questions):**\n{prev_text[:4000]}" if prev_text else ""
 
-            # **Format template sections strictly**
             sections_formatted = "\n".join([
                 f"### Section: {section['section_name']}\n"
                 f"Number of Questions: {section['questions']}\n"
@@ -228,56 +227,83 @@ def upload_files(request):
                 for section in template.sections
             ])
 
+            # ✅ Fix: Construct the expected output section format outside the f-string
+            formatted_sections_output = ''.join(
+                f"### {section['section_name'].upper()}\n"
+                f"{section['instructions']}\n\n" +
+                '\n'.join(f"Q{i+1}. [Generated question here]" for i in range(section['questions'])) +
+                "\n\n"
+                for section in template.sections
+            )
 
-
+            # ✅ Prompt construction
             prompt = f"""
-                        You are an expert in university-level question paper creation.
-                        Your task is to generate a question paper **STRICTLY following the given template.**
-                        You MUST maintain the same **number of sections, question count per section, and marks distribution.**
+You are an expert university professor creating exam papers. Generate a question paper that EXACTLY matches the provided template structure.
 
-                         ### **DO NOT:**
-                        - Do NOT modify the number of sections or their order.
-                        - Do NOT add or remove questions.
-                        - Do NOT change the marks distribution.
-                        - Do NOT repeat questions from the previous exam paper.
+### 🔹 STRICT REQUIREMENTS:
+1. PRESERVE THE TEMPLATE STRUCTURE:
+   - Maintain the exact number of sections in the given order
+   - Each section must have precisely the specified number of questions
+   - Never modify marks distribution or total marks
 
-                        ---
-                        Question Paper Format (Follow This Exactly)
-                        Name: ________________  
-                        Reg No: ________________  
+2. QUESTION GENERATION RULES:
+   - Create ORIGINAL questions based on the study material
+   - NEVER copy questions from previous papers (if provided)
+   - Ensure appropriate difficulty for university-level exams
+   - Questions should cover different aspects of the study material
 
-                        {template.exam_title}  
-                        Course Code: {template.course_code}  
-                        Course Name: {template.course_name}  
-                        Time Duration: {template.time_duration}  
-                        Max Marks: {template.max_marks}  
+3. FORMATTING:
+   - Use the EXACT header format shown below
+   - Maintain consistent numbering (Q1, Q2, etc.)
+   - Include all specified section instructions
+   - Preserve all template placeholders (Name, Reg No, etc.)
 
-                        ---
+### 📝 TEMPLATE DETAILS (MUST INCLUDE VERBATIM):
+Exam Title: {template.exam_title}
+Course Code: {template.course_code}
+Course Name: {template.course_name}
+Time Duration: {template.time_duration}
+Max Marks: {template.max_marks}
 
-                        Sections
-                        {sections_formatted}
+### 📑 SECTION STRUCTURE (FOLLOW EXACTLY):
+{sections_formatted}
 
-                       
+### 📚 STUDY MATERIAL CONTENT (Base questions on this):
+{study_text[:10000]}  [First 10,000 characters]
 
-                        ---
+### 🚫 PREVIOUS QUESTIONS TO AVOID (If provided):
+{prev_text[:2000] if prev_text else "N/A"}
 
-                        **Study Material (Use to Generate New Questions, NO Copy-Pasting):**  
-                        {study_text}
+### ✏️ REQUIRED OUTPUT FORMAT:
 
-                        ---
-                         **Rules for Generation:**  
-                        1. **Strictly follow the provided template** (same sections, number of questions, marks).  
-                        2. **Use the previous exam paper as a reference (if provided), but DO NOT repeat questions.**  
-                        3. **Do NOT modify the question numbering, section names, or formatting.**  
-                        4. **Ensure difficulty is appropriate for university-level exams.**  
+[START OF FORMAT]
+Name: ________________
+Reg No: ________________
 
-                        Generate the Final Question Paper Below (Follow Formatting Exactly):
-                        """
+{template.exam_title.upper()}
+Course Code: {template.course_code}
+Course Name: {template.course_name}
+Time Duration: {template.time_duration}
+Max Marks: {template.max_marks}
 
-            print(prompt)
+---
+
+{formatted_sections_output}
+[END OF FORMAT]
+
+### ✅ FINAL CHECK:
+Before responding, verify:
+1. All sections are present in correct order
+2. Exact question counts per section
+3. No duplication from previous papers
+4. Proper formatting maintained
+5. All template fields included verbatim
+"""
+
+            print(prompt)  # Debug prompt
 
             try:
-                response = ollama.chat(model="mistral", messages=[{"role": "user", "content": prompt}])
+                response = ollama.chat(model="qnest-tuned", messages=[{"role": "user", "content": prompt}])
 
                 if "message" not in response or "content" not in response["message"]:
                     messages.error(request, "Invalid response from the model.")
@@ -300,11 +326,11 @@ def upload_files(request):
                 messages.error(request, f"Ollama request failed: {str(e)}")
                 return redirect('upload')
 
-  
+    # For GET requests or fallback
     templates = Template.objects.filter(user=request.user).order_by("id") 
-    print("Templates in DB:", list(Template.objects.filter(user=request.user)))  
-    print("Templates Passed to Template:", list(templates)) 
-    return render(request, "upload.html", {"templates": templates}) 
+    print("Templates in DB:", list(templates))  
+    return render(request, "upload.html", {"templates": templates})
+
 
 
 @login_required
