@@ -219,24 +219,24 @@ def upload_files(request):
 
             prev_qstn_text = f"### **Previous Exam Paper (Use as Reference, Do NOT Repeat Questions):**\n{prev_text[:4000]}" if prev_text else ""
 
+            # Updated to use 'total_questions' instead of 'questions'
             sections_formatted = "\n".join([
                 f"### Section: {section['section_name']}\n"
-                f"Number of Questions: {section['questions']}\n"
+                f"Number of Questions: {section['total_questions']}\n"
                 f"Marks per Question: {section['marks_per_question']}\n"
                 f"Instructions: {section['instructions']}\n"
                 for section in template.sections
             ])
 
-            # ✅ Fix: Construct the expected output section format outside the f-string
+            # Updated to use 'total_questions' instead of 'questions'
             formatted_sections_output = ''.join(
                 f"### {section['section_name'].upper()}\n"
                 f"{section['instructions']}\n\n" +
-                '\n'.join(f"Q{i+1}. [Generated question here]" for i in range(section['questions'])) +
+                '\n'.join(f"Q{i+1}. [Generated question here]" for i in range(section['total_questions'])) +
                 "\n\n"
                 for section in template.sections
             )
 
-            # ✅ Prompt construction
             prompt = f"""
 You are an expert university professor creating exam papers. Generate a question paper that EXACTLY matches the provided template structure.
 
@@ -300,10 +300,10 @@ Before responding, verify:
 5. All template fields included verbatim
 """
 
-            print(prompt)  # Debug prompt
+            print(prompt)
 
             try:
-                response = ollama.chat(model="qnest-tuned", messages=[{"role": "user", "content": prompt}])
+                response = ollama.chat(model="mistral", messages=[{"role": "user", "content": prompt}])
 
                 if "message" not in response or "content" not in response["message"]:
                     messages.error(request, "Invalid response from the model.")
@@ -326,9 +326,7 @@ Before responding, verify:
                 messages.error(request, f"Ollama request failed: {str(e)}")
                 return redirect('upload')
 
-    # For GET requests or fallback
     templates = Template.objects.filter(user=request.user).order_by("id") 
-    print("Templates in DB:", list(templates))  
     return render(request, "upload.html", {"templates": templates})
 
 
