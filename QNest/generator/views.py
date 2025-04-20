@@ -11,7 +11,8 @@ import ollama
 from django.contrib import messages
 import re
 from django.conf import settings
-
+import base64
+from django.utils.html import escape
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
 from django.template.loader import render_to_string
@@ -194,7 +195,28 @@ def create_template(request):
 
     return redirect("create_template")
 
-
+def escape_latex(text):
+    """Escape special LaTeX characters with proper handling for line breaks"""
+    if not text:
+        return ""
+    
+    replacements = [
+        ('\\', r'\textbackslash{}'),
+        ('&', r'\&'),
+        ('%', r'\%'),
+        ('$', r'\$'),
+        ('#', r'\#'),
+        ('_', r'\_'),
+        ('{', r'\{'),
+        ('}', r'\}'),
+        ('~', r'\textasciitilde{}'),
+        ('^', r'\^{}'),
+        ('\n', r'\\' + '\n'),  # Proper LaTeX line breaks
+    ]
+    
+    for orig, repl in replacements:
+        text = text.replace(orig, repl)
+    return text
 
 @login_required
 @csrf_protect
@@ -238,47 +260,59 @@ def upload_files(request):
             prev_text = "\n\n".join(prev_texts) if prev_texts else ""
 
             sections_prompt = "\n".join(
-                f"""
-                === EXAMPLE FORMAT FOR {section['section_name'].upper()} ===
-                PART-{section['section_name'].upper()}
-                Answer all the questions.
-                Each carries {section['marks_per_question']} mark(s).
-                
-                [EXACTLY {section['total_questions']} QUESTIONS SHOULD APPEAR HERE]
-                """
-                for section in template.sections
-            )
+                                f"""
+                                === REQUIRED FORMAT FOR {section['section_name'].upper()} ===
+                                **{section['section_name'].upper()}**
+                                {"**Answer all questions.**" if section.get('answer_all', True) 
+                                else f"**Answer any {section.get('questions_to_answer', 3)} questions.**"} Each carries {section['marks_per_question']} mark(s).
+                                
+                                [TOTAL QUESTIONS: {section['total_questions']}]
+                                """
+                                for section in template.sections
+                            )
 
-            # Final prompt with stricter formatting instructions
             prompt = f"""
-            Generate a question paper with EXACTLY this format for each section:
+                            You are an **expert academic question paper generator** with deep knowledge of educational standards across universities and schools.
 
-            FOR EACH SECTION YOU MUST INCLUDE:
-            1. NEVER include chapter names/titles in question
-            2. Section header as "PART-[LETTER]" (e.g., "PART-A")
-            3. IMMEDIATELY FOLLOWED BY these two lines:
-               - "Answer all the questions."
-               - "Each carries [X] mark(s)."
-            4. Then exactly [N] numbered questions (1., 2., 3., etc.)
-            
-            THIS IS NON-NEGOTIABLE FORMATTING. DO NOT OMIT ANY OF THESE LINES.
-            
-            STUDY MATERIAL:
-            {study_text[:10000]}
+                            Your task is to generate a structured and academically appropriate question paper based **strictly** on the template format and study material provided. This must resemble real university/school question papers in structure and tone.
 
-            PREVIOUS QUESTIONS TO AVOID:
-            {prev_text[:2000] if prev_text else "NONE"}
+                            MANDATORY GUIDELINES:
 
-            REQUIRED SECTION FORMATS:
-            {sections_prompt}
+                            1. FOR EACH SECTION:
+                                - Begin with the section name in bold (e.g., **PART-A**, **PART-B**, etc.)
+                                - Immediately below, include exactly one bold instruction line:
+                                    - If the section requires all questions to be answered: "**Answer all questions. Each carries [X] mark(s).**"
+                                    - If only a subset needs to be answered: "**Answer any [Y] questions. Each carries [X] mark(s).**"
+                                - After the instruction, list exactly the number of questions specified in the template (`[N]`).
+                                - Number the questions sequentially: 1., 2., 3., ...
 
-            YOUR OUTPUT MUST:
-            - Start each section with PART-[LETTER]
-            - Include BOTH mandatory lines after each section header
-            - Include exactly the specified number of questions
-            - Number all questions (1., 2., etc.)
-            - NOT add any extra text or comments
-            """
+                            2. DO NOT include any chapter titles, names, or hints to source material in the questions.
+
+                            3. Questions should be clearly worded, academic in nature, and reflect the expected depth based on the marks per question:
+                                - For 1-mark or 2-mark questions: Keep them concise and factual.
+                                - For 5-mark or 10-mark questions: Ensure they require detailed, conceptual or analytical answers.
+
+                            4. All questions **must be derived from the study material**. Previous questions (if any) are provided for **reference only to AVOID repetition or similarity**.
+
+                            5. Ensure all sections follow the **exact structure and total number of questions** as per the SECTION TEMPLATE.
+
+                            ---
+
+                            STUDY MATERIAL (SOURCE CONTENT TO BASE QUESTIONS ON):
+                            {study_text[:10000]}
+
+                            PREVIOUS QUESTIONS TO AVOID REPETITION:
+                            {prev_text[:2000] if prev_text else "NONE PROVIDED"}
+
+                            ---
+
+                            SECTION FORMATTING TEMPLATE:
+                            {sections_prompt}
+
+                            ---
+
+                            GENERATE THE FULL QUESTION PAPER BELOW:
+                            """
             try:
                 response = ollama.chat(
                     model="mistral",
@@ -293,19 +327,29 @@ def upload_files(request):
                         }
                     ],
                     options={
-                        'temperature': 0.2,  # Lower for more consistent formatting
-                        'repeat_penalty': 1.2  # Helps prevent omission of required lines
+                        'temperature': 0.2,
+                        'repeat_penalty': 1.2
                     }
                 )
 
                 questions = response["message"]["content"].strip()
+                
+                # Store the generated content
                 request.session["last_generated_questions"] = questions
                 request.session["last_template_id"] = template_id
+                
+                # Generate and store PDF
+                pdf_response = generate_pdf_response(request, template, questions)
+                if pdf_response.status_code == 200:
+                    request.session["pdf_preview"] = base64.b64encode(pdf_response.content).decode('utf-8')
+                else:
+                    messages.error(request, "PDF generation failed for preview")
 
                 return render(request, "upload.html", {
                     "templates": Template.objects.filter(user=request.user).order_by("id"),
                     "generated_questions": questions,
-                    "template_id": template_id
+                    "template_id": template_id,
+                    "pdf_preview_available": "pdf_preview" in request.session,
                 })
 
             except Exception as e:
@@ -315,47 +359,10 @@ def upload_files(request):
     templates = Template.objects.filter(user=request.user).order_by("id")
     return render(request, "upload.html", {"templates": templates})
 
-def escape_latex(text):
-    """Escape special LaTeX characters with proper handling for line breaks"""
-    if not text:
-        return ""
-    
-    replacements = [
-        ('\\', r'\textbackslash{}'),
-        ('&', r'\&'),
-        ('%', r'\%'),
-        ('$', r'\$'),
-        ('#', r'\#'),
-        ('_', r'\_'),
-        ('{', r'\{'),
-        ('}', r'\}'),
-        ('~', r'\textasciitilde{}'),
-        ('^', r'\^{}'),
-        ('\n', r'\\' + '\n'),  # Proper LaTeX line breaks
-    ]
-    
-    for orig, repl in replacements:
-        text = text.replace(orig, repl)
-    return text
-    
-@login_required
-def download_generated_pdf(request):
-    questions = request.session.get("last_generated_questions")
-    template_id = request.session.get("last_template_id")
-
-    if not questions or not template_id:
-        return HttpResponse("No question paper found. Please generate one first.", status=400)
-
-    try:
-        template = Template.objects.get(id=template_id, user=request.user)
-    except Template.DoesNotExist:
-        return HttpResponse("Invalid template.", status=400)
-
-    # Enhanced LaTeX escaping with section preservation
+def generate_pdf_response(request, template, questions):
+    """Helper function to generate PDF response"""
     escaped_questions = escape_latex(questions)
-    
-    # Ensure consistent line breaks for LaTeX
-    escaped_questions = re.sub(r'(?<!\\)\\\n', r'\\ \n', escaped_questions)  # Ensure proper line breaks
+    escaped_questions = re.sub(r'(?<!\\)\\\n', r'\\ \n', escaped_questions)
     
     latex_context = {
         "exam_title": escape_latex(template.exam_title),
@@ -370,37 +377,42 @@ def download_generated_pdf(request):
     latex_string = render_to_string("question_template.tex", latex_context)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Write LaTeX source
         tex_path = os.path.join(tmpdir, "paper.tex")
         with open(tex_path, "w", encoding='utf-8') as f:
             f.write(latex_string)
 
-        # Compile LaTeX (run twice for proper TOC/references)
         try:
             latex_cmd = ["pdflatex", "-interaction=nonstopmode", "-output-directory", tmpdir, tex_path]
             subprocess.run(latex_cmd, cwd=tmpdir, check=True, timeout=30)
-            subprocess.run(latex_cmd, cwd=tmpdir, check=True, timeout=30)  # Second run for references
-        except subprocess.CalledProcessError as e:
-            error_log = os.path.join(tmpdir, "paper.log")
-            if os.path.exists(error_log):
-                with open(error_log, 'r', encoding='utf-8') as log_file:
-                    error_details = log_file.read()[-2000:]  # Get last part of log
-            else:
-                error_details = str(e)
-            return HttpResponse(f"LaTeX compilation failed: {error_details}", status=500)
-        except subprocess.TimeoutExpired:
-            return HttpResponse("LaTeX compilation timed out.", status=500)
+            subprocess.run(latex_cmd, cwd=tmpdir, check=True, timeout=30)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            return HttpResponse("PDF generation failed", status=500)
 
-        # Return generated PDF
         pdf_path = os.path.join(tmpdir, "paper.pdf")
         if os.path.exists(pdf_path):
             with open(pdf_path, "rb") as f:
                 response = HttpResponse(f.read(), content_type="application/pdf")
-                response["Content-Disposition"] = f'attachment; filename="{escape_latex(template.exam_title)}.pdf"'
                 return response
-        return HttpResponse("PDF generation failed.", status=500)
+        return HttpResponse("PDF generation failed", status=500)
 
+@login_required
+def download_generated_pdf(request):
+    questions = request.session.get("last_generated_questions")
+    template_id = request.session.get("last_template_id")
 
+    if not questions or not template_id:
+        return HttpResponse("No question paper found. Please generate one first.", status=400)
+
+    try:
+        template = Template.objects.get(id=template_id, user=request.user)
+    except Template.DoesNotExist:
+        return HttpResponse("Invalid template.", status=400)
+
+    pdf_response = generate_pdf_response(request, template, questions)
+    if pdf_response.status_code == 200:
+        pdf_response["Content-Disposition"] = f'attachment; filename="{escape(template.exam_title)}.pdf"'
+        return pdf_response
+    return HttpResponse("PDF generation failed", status=500)
 
 
 @login_required

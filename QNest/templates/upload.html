@@ -1,68 +1,48 @@
 {% extends "base.html" %}
-{% load static %}
-{% block title %}Upload Exam Materials{% endblock %}
 {% block content %}
-
-<div class="upload-container">
-  <h2>Upload Exam Materials</h2>
-
-  <form id="upload-form" method="POST" enctype="multipart/form-data">
+<h2>Generate Question Paper</h2>
+<form method="post" enctype="multipart/form-data">
     {% csrf_token %}
-
-    <div class="form-section">
-      <div class="form-group">
-        <label>Select a Template:</label>
-        <select name="template_id" required>
-          {% if templates %}
+    <div class="form-group">
+        <label for="template_id">Select Template:</label>
+        <select class="form-control" id="template_id" name="template_id" required>
             {% for template in templates %}
-              <option value="{{ template.id }}" {% if template.id|stringformat:"s" == template_id|stringformat:"s" %}selected{% endif %}>
-                {{ template.template_name }}
-              </option>
+            <option value="{{ template.id }}">{{ template.exam_title }}</option>
             {% endfor %}
-          {% else %}
-            <option value="" disabled>No templates available</option>
-          {% endif %}
         </select>
-      </div>
     </div>
-
-    <div class="form-section">
-      <h2>Upload Study Materials</h2>
-      <div class="form-group">
-        <label for="study_material">Study Material PDF: <span style="color: red">*</span></label>
-        <input type="file" id="study_material" name="study_material" accept="application/pdf" required multiple />
-      </div>
-
-      <div class="form-group">
-        <label for="previous_question">Previous Question Paper PDF:</label>
-        <input type="file" id="previous_question" name="previous_question" accept="application/pdf" multiple />
-      </div>
+    
+    <div class="form-group">
+        <label for="study_material">Study Material (PDF):</label>
+        <input type="file" class="form-control-file" id="study_material" name="study_material" accept=".pdf" multiple required>
     </div>
-
-    <button type="submit" name="generate_question_paper">Generate Question Paper</button>
-  </form>
-
-  {% if messages %}
-    {% for message in messages %}
-      <div class="error-message">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-
-  {% if generated_questions %}
-  <div class="question-paper">
-    <h2>Generated Question Paper</h2>
-    <div id="question-paper" style="white-space: pre-wrap; font-family: monospace; border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem;">
-      {{ generated_questions }}
+    
+    <div class="form-group">
+        <label for="previous_question">Previous Questions (PDF, optional):</label>
+        <input type="file" class="form-control-file" id="previous_question" name="previous_question" accept=".pdf" multiple>
     </div>
-  
-    <div class="action-buttons" style="margin-top: 1rem;">
-      <a href="{% url 'download_generated_pdf' %}">
-        <button type="button">Download as PDF (LaTeX)</button>
-      </a>
+    
+    <button type="submit" name="generate_question_paper" class="btn btn-primary">Generate Question Paper</button>
+</form>
+
+{% if generated_questions %}
+<div class="mt-4">
+    <h3>Generated Questions</h3>
+    <pre>{{ generated_questions }}</pre>
+    
+    {% if pdf_preview_available %}
+    <div class="mt-4">
+        <h4>PDF Preview</h4>
+        <div class="embed-responsive embed-responsive-16by9">
+            <embed class="embed-responsive-item" 
+                   src="data:application/pdf;base64,{{ request.session.pdf_preview }}#toolbar=0&navpanes=0&scrollbar=0"
+                   type="application/pdf">
+        </div>
+        <a href="{% url 'download_generated_pdf' %}" class="btn btn-success mt-3">
+            Download PDF
+        </a>
     </div>
-  </div>
-  
-  {% endif %}
+    {% endif %}
 </div>
-
+{% endif %}
 {% endblock %}
