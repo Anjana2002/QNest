@@ -1,7 +1,7 @@
 from django.contrib import admin
-from .models import StudyMaterial, PreviousQuestionPaper, Template
+from .models import  Template,  GeneratedPDF
 
 # Register the models
-admin.site.register(StudyMaterial)
-admin.site.register(PreviousQuestionPaper)
+
 admin.site.register(Template)
+admin.site.register(GeneratedPDF)

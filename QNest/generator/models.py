@@ -1,16 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
 
-class StudyMaterial(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
-    title = models.CharField(max_length=255)  
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-
-class PreviousQuestionPaper(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
-    title = models.CharField(max_length=255) 
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-
 
 class Template(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -25,3 +15,12 @@ class Template(models.Model):
 
     def __str__(self):
         return f"{self.template_name} - {self.course_name}"
+
+class GeneratedPDF(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    template = models.ForeignKey('Template', on_delete=models.CASCADE)
+    pdf_file = models.FileField(upload_to='generated_pdfs/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"PDF by {self.user.username} for {self.template.template_name} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
