@@ -1,13 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Generate Question Paper</h2>
+
 <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
+    
     <div class="form-group">
         <label for="template_id">Select Template:</label>
         <select class="form-control" id="template_id" name="template_id" required>
             {% for template in templates %}
-            <option value="{{ template.id }}">{{ template.exam_title }}</option>
+                <option value="{{ template.id }}">{{ template.exam_title }}</option>
             {% endfor %}
         </select>
     </div>
@@ -25,24 +27,28 @@
     <button type="submit" name="generate_question_paper" class="btn btn-primary">Generate Question Paper</button>
 </form>
 
-{% if generated_questions %}
+{% if pdf_preview %}
 <div class="mt-4">
-    <h3>Generated Questions</h3>
-    <pre>{{ generated_questions }}</pre>
+    <h3>Generated Question Paper Preview</h3>
+    <div class="alert alert-info">
+        <strong>Note:</strong> The preview below might not show all formatting perfectly. 
+        Download the PDF for the exact version.
+    </div>
     
-    {% if pdf_preview_available %}
-    <div class="mt-4">
-        <h4>PDF Preview</h4>
-        <div class="embed-responsive embed-responsive-16by9">
-            <embed class="embed-responsive-item" 
-                   src="data:application/pdf;base64,{{ request.session.pdf_preview }}#toolbar=0&navpanes=0&scrollbar=0"
-                   type="application/pdf">
-        </div>
-        <a href="{% url 'download_generated_pdf' %}" class="btn btn-success mt-3">
-            Download PDF
+    <div class="pdf-preview-container mt-3">
+        <embed src="data:application/pdf;base64,{{ pdf_preview }}" 
+               type="application/pdf" 
+               width="100%" 
+               height="600px"
+               style="border: 1px solid #ccc;">
+    </div>
+    
+    <div class="mt-3">
+        <a href="{% url 'download_pdf' %}" class="btn btn-success">
+            <i class="fas fa-download"></i> Download PDF
         </a>
     </div>
-    {% endif %}
 </div>
 {% endif %}
+
 {% endblock %}

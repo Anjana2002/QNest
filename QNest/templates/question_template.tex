@@ -1,8 +1,10 @@
 \documentclass[a4paper,12pt]{article}
 \usepackage[margin=1in]{geometry}
-\usepackage{ulem} 
+\usepackage{ulem}
+\usepackage{parskip}  % Better paragraph spacing
 \setlength{\parindent}{0pt}
 \renewcommand{\baselinestretch}{1.2}
+
 \begin{document}
 
 \textbf{Name:} \underline{\hspace{10cm}} \\
@@ -17,12 +19,13 @@ Course Name: {{ course_name }} \\
 Time Duration: {{ time_duration }} \\
 Max Marks: {{ max_marks }}
 
-
 \vspace{1cm}
 \end{center}
 
-\vspace{1.5em}
-
+% Use \obeylines to preserve line breaks but not treat them as commands
+\begingroup
+\obeylines
 {{ questions }}
+\endgroup
 
 \end{document}

@@ -22,11 +22,15 @@
                     <details>
                         <summary><strong>View Sections</strong></summary>
                         {% for section in template.sections %}
-                            <p><strong>Section {{ section.section_name }}:</strong></p>
-                            <p>Questions: {{ section.questions }}</p>
-                            <p>Marks per Question: {{ section.marks_per_question }}</p>
-                            <p>Instructions: {{ section.instructions }}</p>
-                            <hr>
+                            <div style="margin-top: 10px;">
+                                <p><strong>Section {{ section.section_name }}:</strong></p>
+                                <p>Total Questions: {{ section.total_questions }}</p>
+                                <p>Questions to Answer: {{ section.counted_questions }}</p>
+                                <p>Marks per Question: {{ section.marks_per_question }}</p>
+                                <p>Section Marks: {{ section.section_marks }}</p>
+                                <p>Instructions: {{ section.instructions }}</p>
+                            </div>
+                            {% if not forloop.last %}<hr>{% endif %}
                         {% endfor %}
                     </details>
                 {% else %}
