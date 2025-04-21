@@ -289,60 +289,54 @@ def upload_files(request):
             prev_text = "\n\n".join(prev_texts) if prev_texts else ""
 
             sections_prompt = "\n".join(
-                f"""
-                === REQUIRED FORMAT FOR {section['section_name'].upper()} ===
-                **{section['section_name'].upper()}**
-                {"**Answer all questions.**" if section.get('answer_all', True) 
-                else f"**Answer any {section.get('questions_to_answer', 3)} questions.**"} Each carries {section['marks_per_question']} mark(s).
-                
-                [TOTAL QUESTIONS: {section['total_questions']}]
-                """
-                for section in template.sections
-            )
+                                f"""**{section['section_name'].upper()}**
+                            {"**Answer all questions.**" if section.get('answer_all', True) 
+                            else f"**Answer any {section.get('questions_to_answer', 3)} questions.**"} Each carries {section['marks_per_question']} mark(s). [TOTAL QUESTIONS: {section['total_questions']}]"""
+                                for section in template.sections
+                            )
+
 
             prompt = f"""
-            You are an **expert academic question paper generator** with deep knowledge of educational standards across universities and schools.
+            You are an expert academic question paper generator. Generate a properly formatted exam paper following these rules:
 
-            Your task is to generate a structured and academically appropriate question paper based **strictly** on the template format and study material provided. This must resemble real university/school question papers in structure and tone.
+            1. SECTION STRUCTURE:
+            - For each section, follow this exact format:
+                [SECTION NAME in uppercase]
+                [Instruction line]
+                [Questions listed line-by-line]
 
-            MANDATORY GUIDELINES:
+            2. QUESTION FORMATTING:
+            - One question per line
+            - Numbered sequentially (1., 2., 3., etc.)
 
-            1. FOR EACH SECTION:
-                - Begin with the section name in bold (e.g., PART-A, PART-B, etc.)
-                - Immediately below, include exactly one bold instruction line:
-                    - If the section requires all questions to be answered: "**Answer all questions. Each carries [X] mark(s).**"
-                    - If only a subset needs to be answered: "**Answer any [Y] questions. Each carries [X] mark(s).**"
-                - After the instruction, list exactly the number of questions specified in the template ([N]).
-                - Number the questions sequentially: 1., 2., 3., ...
+            3. INSTRUCTIONS:
+            - Must exactly match the template format:
+                * "Answer all questions. Each carries X mark(s)." OR
+                * "Answer any Y questions. Each carries X mark(s)."
 
-            2. DO NOT include any chapter titles, names, or hints to source material in the questions.
+            4. CONTENT REQUIREMENTS:
+            - Questions must be derived from the study material
+            - No chapter titles or source hints
+            - Vary depth based on marks:
+                * 1-2 marks: Concise, factual
+                * 5-10 marks: Detailed, analytical
+                ---
 
-            3. Questions should be clearly worded, academic in nature, and reflect the expected depth based on the marks per question:
-                - For 1-mark or 2-mark questions: Keep them concise and factual.
-                - For 5-mark or 10-mark questions: Ensure they require detailed, conceptual or analytical answers.
-
-            4. All questions **must be derived from the study material**. Previous questions (if any) are provided for **reference only to AVOID repetition or similarity**.
-
-            5. Ensure all sections follow the **exact structure and total number of questions** as per the SECTION TEMPLATE.
-
-            ---
-
-            STUDY MATERIAL (SOURCE CONTENT TO BASE QUESTIONS ON):
+            STUDY MATERIAL (SOURCE CONTENT):
             {study_text[:10000]}
 
-            PREVIOUS QUESTIONS TO AVOID REPETITION:
+            PREVIOUS QUESTIONS (AVOID REPETITION):
             {prev_text[:2000] if prev_text else "NONE PROVIDED"}
 
             ---
 
-            SECTION FORMATTING TEMPLATE:
-            {sections_prompt}
+        SECTION FORMATTING TEMPLATE:
+            {sections_prompt}   
 
-            ---
+    ---
 
-            GENERATE THE FULL QUESTION PAPER BELOW:
-            """
-
+    GENERATE THE EXAM PAPER FOLLOWING THE ABOVE FORMAT EXACTLY:
+    """
             try:
                 response = ollama.chat(
                     model="mistral",
@@ -372,10 +366,12 @@ def upload_files(request):
                 pdf_bytes = generate_pdf_response(request, template, questions)
                 if pdf_bytes:
                     request.session["pdf_preview"] = base64.b64encode(pdf_bytes).decode('utf-8')
+                    request.session["pdf_filename"] = f"{template.exam_title}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
                     messages.success(request, "Question paper generated successfully!")
                     return render(request, "upload.html", {
                         "templates": templates,
                         "pdf_preview": request.session["pdf_preview"],
+                        "pdf_filename": request.session["pdf_filename"],
                         "generated_questions": questions
                     })
                 else:
@@ -451,32 +447,45 @@ def generate_pdf_response(request, template, questions):
 
     
 
+# @login_required
+# def download_generated_pdf(request):
+#     """Download the most recently generated PDF"""
+#     template_id = request.session.get("last_template_id")
+#     if not template_id:
+#         messages.error(request, "No question paper found. Please generate one first.")
+#         return redirect("upload_files")
 
+#     try:
+#         # Get the most recent PDF for this user and template
+#         pdf_instance = GeneratedPDF.objects.filter(
+#             user=request.user,
+#             template_id=template_id
+#         ).latest('created_at')
+        
+#         response = FileResponse(pdf_instance.pdf_file)
+#         response['Content-Disposition'] = f'attachment; filename="{pdf_instance.pdf_file.name}"'
+#         return response
+#     except GeneratedPDF.DoesNotExist:
+#         messages.error(request, "PDF not found. Please generate a new question paper.")
+#         return redirect("upload_files")
+#     except Exception as e:
+#         messages.error(request, f"Error downloading PDF: {str(e)}")
+#         return redirect("upload_files")
 @login_required
-def download_pdf(request):
+def download_generated_pdf(request):
     """Download the most recently generated PDF"""
-    template_id = request.session.get("last_template_id")
-    if not template_id:
+    if 'pdf_preview' not in request.session:
         messages.error(request, "No question paper found. Please generate one first.")
         return redirect("upload_files")
-
+    
     try:
-        # Get the most recent PDF for this user and template
-        pdf_instance = GeneratedPDF.objects.filter(
-            user=request.user,
-            template_id=template_id
-        ).latest('created_at')
-        
-        response = FileResponse(pdf_instance.pdf_file)
-        response['Content-Disposition'] = f'attachment; filename="{pdf_instance.pdf_file.name}"'
+        pdf_bytes = base64.b64decode(request.session['pdf_preview'])
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{request.session.get("pdf_filename", "question_paper.pdf")}"'
         return response
-    except GeneratedPDF.DoesNotExist:
-        messages.error(request, "PDF not found. Please generate a new question paper.")
-        return redirect("upload_files")
     except Exception as e:
         messages.error(request, f"Error downloading PDF: {str(e)}")
         return redirect("upload_files")
-
 
 
 @login_required
