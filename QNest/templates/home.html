@@ -9,131 +9,41 @@
       href="{% static 'images/logo.ico' %}"
       type="image/x-icon"
     />
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      }
-
-      body {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-      }
-
-      .container {
-        background: white;
-        padding: 40px;
-        border-radius: 15px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-        width: 100%;
-        max-width: 400px;
-        text-align: center;
-      }
-
-      h1 {
-        color: #2c3e50;
-        margin-bottom: 30px;
-        font-size: 2.5em;
-      }
-
-      h2 {
-        color: #34495e;
-        margin-bottom: 25px;
-        font-size: 1.8em;
-      }
-
-      .form-group {
-        margin-bottom: 20px;
-        text-align: left;
-      }
-
-      input {
-        width: 100%;
-        padding: 12px;
-        border: 2px solid #e0e0e0;
-        border-radius: 8px;
-        font-size: 16px;
-        transition: border-color 0.3s ease;
-      }
-
-      input:focus {
-        outline: none;
-        border-color: #3498db;
-      }
-
-      button {
-        background: #3498db;
-        color: white;
-        padding: 12px 30px;
-        border: none;
-        border-radius: 8px;
-        font-size: 16px;
-        cursor: pointer;
-        transition: background 0.3s ease;
-        width: 100%;
-      }
-
-      button:hover {
-        background: #2980b9;
-      }
-
-      .error-message {
-        color: #e74c3c;
-        margin-bottom: 20px;
-        padding: 10px;
-        background: #fde8e8;
-        border-radius: 8px;
-      }
-
-      .register-link {
-        margin-top: 20px;
-        color: #7f8c8d;
-      }
-
-      .register-link a {
-        color: #3498db;
-        text-decoration: none;
-        font-weight: 600;
-      }
-
-      .register-link a:hover {
-        text-decoration: underline;
-      }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}" />
   </head>
   <body>
-    <div class="container">
-      <h1>QNest</h1>
-      <h2>Question Generator</h2>
+    <div class="home-container">
+      <h1 class="home-logo">QNest</h1>
+      <h2 class="home-subtitle">Question Generator</h2>
 
       {% if messages %} {% for message in messages %}
-      <div class="error-message">{{ message }}</div>
+      <div class="home-error-message">{{ message }}</div>
       {% endfor %} {% endif %}
 
       <form method="post">
         {% csrf_token %}
-        <div class="form-group">
-          <input type="text" name="username" placeholder="Username" required />
+        <div class="home-form-group username">
+          <input
+            type="text"
+            name="username"
+            class="home-input"
+            placeholder="Username"
+            required
+          />
         </div>
-        <div class="form-group">
+        <div class="home-form-group password">
           <input
             type="password"
             name="password"
+            class="home-input"
             placeholder="Password"
             required
           />
         </div>
-        <button type="submit">Login</button>
+        <button type="submit" class="home-button">Login</button>
       </form>
 
-      <p class="register-link">
+      <p class="home-register-link">
         Don't have an account?
         <a href="{% url 'register' %}">Create New Account</a>
       </p>

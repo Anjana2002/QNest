@@ -30,10 +30,7 @@
 {% if pdf_preview %}
 <div class="mt-4">
     <h3>Generated Question Paper Preview</h3>
-    <div class="alert alert-info">
-        <strong>Note:</strong> The preview below might not show all formatting perfectly. 
-        Download the PDF for the exact version.
-    </div>
+    
     
     <div class="pdf-preview-container mt-3">
         <embed src="data:application/pdf;base64,{{ pdf_preview }}" 

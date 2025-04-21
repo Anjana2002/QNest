@@ -1,9 +1,8 @@
 \documentclass[a4paper,12pt]{article}
 \usepackage[margin=1in]{geometry}
-\usepackage{ulem}
-\usepackage{parskip}  % Better paragraph spacing
+\usepackage{parskip}
+\usepackage{setspace}
 \setlength{\parindent}{0pt}
-\renewcommand{\baselinestretch}{1.2}
 
 \begin{document}
 
@@ -12,20 +11,18 @@
 
 \vspace{1em}
 \begin{center}
-\textbf{\Large {{ exam_title|upper }}}
+\textbf{\Large {{ exam_title }}}
 
 Course Code: {{ course_code }} \\
 Course Name: {{ course_name }} \\
 Time Duration: {{ time_duration }} \\
 Max Marks: {{ max_marks }}
-
-\vspace{1cm}
 \end{center}
 
-% Use \obeylines to preserve line breaks but not treat them as commands
-\begingroup
-\obeylines
+\vspace{1cm}
+
+\begin{spacing}{1.2}
 {{ questions }}
-\endgroup
+\end{spacing}
 
 \end{document}

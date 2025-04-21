@@ -201,40 +201,43 @@ def create_template(request):
             return redirect("create_template")
 
     return redirect("create_template")
+import html
+
 
 def escape_latex(text):
-    """Properly escape text for LaTeX including handling newlines and special chars"""
+    """Comprehensive LaTeX escaping that handles all special cases"""
     if not text:
         return ""
     
     # First unescape HTML entities
+    from html import unescape
     text = unescape(text)
     
-    # Replace problematic characters
-    replacements = {
-        '&': r'\&',
-        '%': r'\%',
-        '$': r'\$',
-        '#': r'\#',
-        '_': r'\_',
-        '{': r'\{',
-        '}': r'\}',
-        '~': r'\textasciitilde{}',
-        '^': r'\textasciicircum{}',
-        '\\': r'\textbackslash{}',
-        '"': r'"{}',  # Proper LaTeX quotes
-        '\n': '\n\n',  # Convert single newlines to paragraph breaks
-        '\r': '',      # Remove carriage returns
-        '===': '',     # Remove section markers
-    }
+    # Replace special characters in order of importance
+    replacements = [
+        ('\\', r'\textbackslash{}'),
+        ('&', r'\&'),
+        ('%', r'\%'),
+        ('$', r'\$'),
+        ('#', r'\#'),
+        ('_', r'\_'),
+        ('{', r'\{'),
+        ('}', r'\}'),
+        ('~', r'\textasciitilde{}'),
+        ('^', r'\textasciicircum{}'),
+        ('<', r'\textless{}'),
+        ('>', r'\textgreater{}'),
+        ('"', r'"{}'),
+        ("'", r"'"),
+        ('\r\n', '\n\n'),  # Windows
+        ('\r', '\n\n'),    # Old Mac
+        ('\n', '\n\n'),    # Unix
+    ]
     
-    # Compile regex pattern for all replacements
-    pattern = re.compile('|'.join(re.escape(key) for key in replacements.keys()))
+    for char, replacement in replacements:
+        text = text.replace(char, replacement)
     
-    # Perform replacements
-    text = pattern.sub(lambda match: replacements[match.group(0)], text)
-    
-    # Remove any remaining LaTeX-incompatible characters
+    # Remove control characters
     text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
     
     return text
@@ -387,22 +390,25 @@ def upload_files(request):
 
     return render(request, "upload.html", {"templates": templates})
 
+
 def generate_pdf_response(request, template, questions):
-    """Generate PDF from LaTeX and save to DB"""
+    """Robust PDF generation with proper template handling"""
     try:
         escaped_questions = escape_latex(questions)
         escaped_questions = re.sub(r'\\n', '\n', escaped_questions)  # Fix any remaining newline issues
-        escaped_questions = re.sub(r'(?<!\\)\\', r'\\textbackslash{}', escaped_questions)
+        escaped_questions = re.sub(r'(?<!\\)\\', r'\\textbackslash{}',escaped_questions)
         latex_context = {
             "exam_title": escape_latex(template.exam_title),
             "course_code": escape_latex(template.course_code),
             "course_name": escape_latex(template.course_name),
             "time_duration": escape_latex(template.time_duration),
             "max_marks": escape_latex(str(template.max_marks)),
-            "questions": escaped_questions,
-            "font_size": getattr(settings, 'LATEX_FONT_SIZE', '12pt'),
+            "questions": escape_latex(questions),
         }
 
+        # Render template with proper variable syntax
+        latex_string = render_to_string("question_template.tex", latex_context)
+        
         latex_string = render_to_string("question_template.tex", latex_context)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -445,32 +451,6 @@ def generate_pdf_response(request, template, questions):
         print(f"Error in PDF generation: {str(e)}")
         return None
 
-    
-
-# @login_required
-# def download_generated_pdf(request):
-#     """Download the most recently generated PDF"""
-#     template_id = request.session.get("last_template_id")
-#     if not template_id:
-#         messages.error(request, "No question paper found. Please generate one first.")
-#         return redirect("upload_files")
-
-#     try:
-#         # Get the most recent PDF for this user and template
-#         pdf_instance = GeneratedPDF.objects.filter(
-#             user=request.user,
-#             template_id=template_id
-#         ).latest('created_at')
-        
-#         response = FileResponse(pdf_instance.pdf_file)
-#         response['Content-Disposition'] = f'attachment; filename="{pdf_instance.pdf_file.name}"'
-#         return response
-#     except GeneratedPDF.DoesNotExist:
-#         messages.error(request, "PDF not found. Please generate a new question paper.")
-#         return redirect("upload_files")
-#     except Exception as e:
-#         messages.error(request, f"Error downloading PDF: {str(e)}")
-#         return redirect("upload_files")
 @login_required
 def download_generated_pdf(request):
     """Download the most recently generated PDF"""
@@ -494,9 +474,10 @@ def template_view(request):
     return  render(request, 'template.html', {'templates':templates})
 
 @login_required
-def question_view(request):
-    user_pdfs = GeneratedPDF.objects.filter(user=request.user).order_by('-created_at')
-    return render(request, 'question.html', {'user_pdfs': user_pdfs})
+def view_generated_pdfs(request):
+    generated_pdfs = GeneratedPDF.objects.filter(user=request.user).order_by("-created_at")
+    return render(request, "question.html", {"generated_pdfs": generated_pdfs})
+
 
 @login_required
 def mcq(request):
