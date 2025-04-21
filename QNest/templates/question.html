@@ -1,23 +1,27 @@
-{% extends 'base.html' %}
-{% block title %}Questions{% endblock %}
+{% extends "base.html" %} {% block content %}
 
-{% block content %}
-<div class="mt-5">
-    <h4>Your Generated PDFs</h4>
-    {% if user_pdfs %}
-        <ul class="list-group">
-            {% for pdf in user_pdfs %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    {{ pdf.template.template_name }} - {{ pdf.created_at|date:"Y-m-d H:i" }}
-                    <a href="{{ pdf.pdf_file.url }}" class="btn btn-primary btn-sm" target="_blank">View</a>
-                    <a href="{% url 'download_generated_pdf' pdf.id %}" class="btn btn-success btn-sm">Download</a>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>No PDFs generated yet.</p>
-    {% endif %}
+<div class="question-container">
+  <h2>Generated Question Papers</h2>
+
+  {% if generated_pdfs %}
+  <ul class="question-list">
+    {% for pdf in generated_pdfs %}
+    <li class="question-item">
+      <strong>{{ pdf.template.exam_title }}</strong>
+      <p>Template: {{ pdf.template.template_name }}</p>
+      <p>Created on: {{ pdf.created_at|date:"Y-m-d H:i" }}</p>
+      <div class="question-actions">
+        <a href="{{ pdf.pdf_file.url }}" target="_blank">View PDF</a>
+        <a href="{{ pdf.pdf_file.url }}" download>Download PDF</a>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="no-questions">No question papers generated yet.</p>
+  {% endif %}
+
+  <a href="{% url 'upload_files' %}" class="back-link">← Back to Upload</a>
 </div>
-
 
 {% endblock %}
