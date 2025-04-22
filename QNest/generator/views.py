@@ -369,12 +369,41 @@ def upload_files(request):
             #                 else f"Answer any {section.get('questions_to_answer', 3)} questions."} Each carries {section['marks_per_question']} marks."""
             #                     for section in template.sections
             #                 )
+            # sections_prompt = "\n".join(
+            #                     f"""**{section['section_name'].upper()}**
+            #                 {"**Answer all questions.**" if section.get('answer_all', True) 
+            #                 else f"**Answer any {section.get('questions_to_answer', 3)} questions.**"} Each carries {section['marks_per_question']} mark(s). [TOTAL QUESTIONS: {section['total_questions']}]"""
+            #                     for section in template.sections
+            #                 )
             sections_prompt = "\n".join(
-                                f"""**{section['section_name'].upper()}**
-                            {"**Answer all questions.**" if section.get('answer_all', True) 
-                            else f"**Answer any {section.get('questions_to_answer', 3)} questions.**"} Each carries {section['marks_per_question']} mark(s). [TOTAL QUESTIONS: {section['total_questions']}]"""
+                                f"""{section['section_name'].upper()}
+                            {section.get('instructions') or f"Answer any {section['counted_questions']} questions out of {section['total_questions']}."} Each carries {section['marks_per_question']} mark(s).
+                            --> Generate exactly {section['counted_questions']} questions for this section."""
                                 for section in template.sections
                             )
+            # sections_prompt = ""
+            # for section in template.sections:
+            #     sections_prompt += f"""
+            # SECTION {section['section_name']} - {section['section_name']}
+            # Instructions: {section.get('instructions') or f"Answer any {section['counted_questions']} questions out of {section['total_questions']}."}
+            # Each question carries {section['marks_per_question']} marks.
+            #     """
+
+            # # 2. Generate strict enforcement block
+            # strict_count_lines = "\n".join(
+            #     f"- {section['section_name']}: {section['total_questions']} questions"
+            #     for section in template.sections
+            # )
+            # strict_enforcement = f"""
+            # STRICT QUESTION COUNT PER SECTION:
+            # {strict_count_lines}
+            # - Do NOT skip or reduce the number of questions.
+            # - If instructed to "Answer any Y out of Z", you must still generate **Z questions**.
+            # """
+
+
+
+
 
             prompt = f"""
             You are an expert academic question paper generator. Generate a properly formatted exam paper following these rules:
@@ -390,17 +419,18 @@ def upload_files(request):
             - Numbered sequentially (1., 2., 3., etc.)
 
             3. INSTRUCTIONS:
-            - Must exactly match the template format:
+            - Each section will explicitly say how many questions to generate. You must generate exactly that number per section.
+            - Follow the formatting exactly:
                 * "Answer all questions. Each carries X mark(s)." OR
                 * "Answer any Y questions. Each carries X mark(s)."
 
             4. CONTENT REQUIREMENTS:
-            - Questions must be derived from the study material
+            - Questions must be derived from the study material only
+            - Do NOT repeat questions from the previous question paper
             - No chapter titles or source hints
             - Vary depth based on marks:
                 * 1-2 marks: Concise, factual
                 * 5-10 marks: Detailed, analytical
-                ---
 
             STUDY MATERIAL (SOURCE CONTENT):
             {study_text[:10000]}
@@ -412,7 +442,7 @@ def upload_files(request):
 
         SECTION FORMATTING TEMPLATE:
             {sections_prompt}   
-
+            
     ---
 
     GENERATE THE EXAM PAPER FOLLOWING THE ABOVE FORMAT EXACTLY:
