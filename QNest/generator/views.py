@@ -204,16 +204,25 @@ def create_template(request):
 import html
 
 
+
+
 def escape_latex(text):
-    """Comprehensive LaTeX escaping that handles all special cases"""
+    """Comprehensive LaTeX escaping with thorough HTML entity handling"""
     if not text:
         return ""
     
-    # First unescape HTML entities
+    import re
     from html import unescape
+    
+    # STEP 1: Handle all HTML entities by converting them to their Unicode equivalents
+    # This catches things like &#x27; (apostrophe), &amp; (ampersand), &quot; (quote), etc.
     text = unescape(text)
     
-    # Replace special characters in order of importance
+    # STEP 2: Normalize line endings
+    text = text.replace('\r\n', '\n')  # Windows line endings to Unix
+    text = text.replace('\r', '\n')    # Old Mac line endings to Unix
+    
+    # STEP 3: Comprehensive LaTeX character escaping
     replacements = [
         ('\\', r'\textbackslash{}'),
         ('&', r'\&'),
@@ -227,18 +236,81 @@ def escape_latex(text):
         ('^', r'\textasciicircum{}'),
         ('<', r'\textless{}'),
         ('>', r'\textgreater{}'),
-        ('"', r'"{}'),
-        ("'", r"'"),
-        ('\r\n', '\n\n'),  # Windows
-        ('\r', '\n\n'),    # Old Mac
-        ('\n', '\n\n'),    # Unix
+        ('"', r'\textquotedblright{}'),
+        ("'", r'\textquoteright{}'),
+        ('`', r'\textasciigrave{}'),
+        ('|', r'\textbar{}'),
+        ('...', r'\ldots{}'),
+        ('–', r'--'),  # en dash
+        ('—', r'---'),  # em dash
+        ('°', r'$^{\circ}$'),  # degree symbol
+        ('©', r'\copyright{}'),
+        ('®', r'\textregistered{}'),
+        ('™', r'\texttrademark{}'),
+        ('±', r'$\pm$'),
+        ('×', r'$\times$'),
+        ('÷', r'$\div$'),
+        ('≤', r'$\leq$'),
+        ('≥', r'$\geq$'),
+        ('≠', r'$\neq$'),
+        ('≈', r'$\approx$'),
+        ('∞', r'$\infty$'),
+        ('µ', r'$\mu$'),
+        ('α', r'$\alpha$'),
+        ('β', r'$\beta$'),
+        ('γ', r'$\gamma$'),
+        ('δ', r'$\delta$'),
+        ('ε', r'$\varepsilon$'),
+        ('π', r'$\pi$'),
+        ('Σ', r'$\Sigma$'),
+        ('σ', r'$\sigma$'),
+        ('τ', r'$\tau$'),
+        ('ω', r'$\omega$'),
+        ('Ω', r'$\Omega$'),
     ]
     
     for char, replacement in replacements:
         text = text.replace(char, replacement)
     
-    # Remove control characters
-    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
+    # STEP 4: Handle any remaining problematic characters
+    # Replace any remaining non-ASCII characters with their LaTeX equivalents or remove if no equivalent
+    def replace_non_ascii(match):
+        char = match.group(0)
+        try:
+            return f"\\symbol{{{ord(char)}}}"
+        except:
+            return ""
+    
+    text = re.sub(r'[^\x00-\x7F]', replace_non_ascii, text)
+    
+    # STEP 5: Remove any control characters
+    text = re.sub(r'[\x00-\x1F\x7F]', '', text)
+    
+    # STEP 6: Clean up any remaining HTML entities that weren't caught by unescape
+    text = re.sub(r'&[a-zA-Z0-9#]+;', '', text)
+    
+    # STEP 7: Format section headers and questions
+    # Match patterns like "**SECTION A**" or "SECTION A" at the beginning of lines
+    text = re.sub(r'\n\s*(?:\*\*)?([A-Z][A-Z\s]+)(?:\*\*)?\s*', r'\n\n\\textbf{\1}\n\n', text)
+    
+    # Handle section instructions like "Answer all questions" with proper formatting
+    text = re.sub(r'\n\s*(?:Answer\s+(?:all|any).+?[.])(?:\s*\n|$)', r'\n\\textit{\0}\n\n', text)
+    
+    # Ensure each question (starting with a digit followed by period) starts on a new line
+    text = re.sub(r'(?<!\n)(\d+\.\s)', r'\n\1', text)
+    
+    # STEP 8: Process line breaks carefully
+    # First mark paragraph breaks (double newlines)
+    text = text.replace('\n\n', '[PARAGRAPH_BREAK]')
+    
+    # Then convert single newlines to LaTeX line breaks
+    text = text.replace('\n', ' \\\\ ')
+    
+    # Finally convert paragraph markers back to LaTeX paragraphs
+    text = text.replace('[PARAGRAPH_BREAK]', '\n\n\\vspace{1em}\n')
+    
+    # Add vertical spacing after question numbering for clarity
+    text = re.sub(r'(\\\\)\s+(\d+\.\s)', r'\1\n\\vspace{0.8em}\n\2', text)
     
     return text
 
@@ -291,13 +363,18 @@ def upload_files(request):
                     print(f"Error extracting text from previous questions PDF: {e}")
             prev_text = "\n\n".join(prev_texts) if prev_texts else ""
 
+            # sections_prompt = "\n".join(
+            #                     f"""{section['section_name'].upper()}
+            #                 {"Answer all questions." if section.get('answer_all', True) 
+            #                 else f"Answer any {section.get('questions_to_answer', 3)} questions."} Each carries {section['marks_per_question']} marks."""
+            #                     for section in template.sections
+            #                 )
             sections_prompt = "\n".join(
                                 f"""**{section['section_name'].upper()}**
                             {"**Answer all questions.**" if section.get('answer_all', True) 
                             else f"**Answer any {section.get('questions_to_answer', 3)} questions.**"} Each carries {section['marks_per_question']} mark(s). [TOTAL QUESTIONS: {section['total_questions']}]"""
                                 for section in template.sections
                             )
-
 
             prompt = f"""
             You are an expert academic question paper generator. Generate a properly formatted exam paper following these rules:
@@ -394,35 +471,50 @@ def upload_files(request):
 def generate_pdf_response(request, template, questions):
     """Robust PDF generation with proper template handling"""
     try:
+        # Process questions to ensure proper line breaks are preserved
         escaped_questions = escape_latex(questions)
-        escaped_questions = re.sub(r'\\n', '\n', escaped_questions)  # Fix any remaining newline issues
-        escaped_questions = re.sub(r'(?<!\\)\\', r'\\textbackslash{}',escaped_questions)
+        
+        # Process other template fields
         latex_context = {
             "exam_title": escape_latex(template.exam_title),
             "course_code": escape_latex(template.course_code),
             "course_name": escape_latex(template.course_name),
             "time_duration": escape_latex(template.time_duration),
             "max_marks": escape_latex(str(template.max_marks)),
-            "questions": escape_latex(questions),
+            "questions": escaped_questions,
         }
 
         # Render template with proper variable syntax
         latex_string = render_to_string("question_template.tex", latex_context)
         
-        latex_string = render_to_string("question_template.tex", latex_context)
-
+        # For debugging: Save raw LaTeX to a file for inspection
+        debug_dir = os.path.join(settings.BASE_DIR, 'debug_latex')
+        os.makedirs(debug_dir, exist_ok=True)
+        debug_file = os.path.join(debug_dir, f"latex_debug_{datetime.now().strftime('%Y%m%d%H%M%S')}.tex")
+        with open(debug_file, 'w', encoding='utf-8') as f:
+            f.write(latex_string)
+        print(f"Debug LaTeX file saved to: {debug_file}")
+        
         with tempfile.TemporaryDirectory() as tmpdir:
             tex_path = os.path.join(tmpdir, "paper.tex")
             with open(tex_path, "w", encoding='utf-8') as f:
                 f.write(latex_string)
 
             try:
-                # Run pdflatex twice to resolve references
+                # Run pdflatex with error handling
                 latex_cmd = ["pdflatex", "-interaction=nonstopmode", "-output-directory", tmpdir, tex_path]
-                result = subprocess.run(latex_cmd, cwd=tmpdir, check=True, timeout=30, 
-                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                result = subprocess.run(latex_cmd, cwd=tmpdir, check=True, timeout=30,
-                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                
+                # First run
+                result = subprocess.run(latex_cmd, cwd=tmpdir, check=False, 
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                
+                # Check for errors in first run
+                if result.returncode != 0:
+                    print(f"LaTeX first pass had warnings/errors: {result.stdout.decode()}")
+                
+                # Second run (for references)
+                result = subprocess.run(latex_cmd, cwd=tmpdir, check=False,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 
                 pdf_path = os.path.join(tmpdir, "paper.pdf")
                 if os.path.exists(pdf_path):
@@ -439,18 +531,19 @@ def generate_pdf_response(request, template, questions):
                         ContentFile(pdf_bytes)
                     )
                     return pdf_bytes
+                else:
+                    print(f"PDF not generated. LaTeX output:\n{result.stdout.decode()}")
+                    return None
                 
-            except subprocess.CalledProcessError as e:
-                print(f"LaTeX compilation failed. Output:\n{e.stdout.decode()}\nError:\n{e.stderr.decode()}")
-                return None
-            except subprocess.TimeoutExpired:
-                print("LaTeX compilation timed out")
+            except Exception as e:
+                print(f"Exception during LaTeX compilation: {str(e)}")
                 return None
 
     except Exception as e:
         print(f"Error in PDF generation: {str(e)}")
         return None
-
+    
+    
 @login_required
 def download_generated_pdf(request):
     """Download the most recently generated PDF"""
