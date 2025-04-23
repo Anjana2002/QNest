@@ -514,14 +514,14 @@ button:hover {
     margin-right: 8px;
   }
   
-  .question-actions a:first-child:before {
+  /* .question-actions a:first-child:before {
     content: '👁️';
   }
   
   .question-actions a:last-child:before {
     content: '⬇️';
   }
-  
+   */
   .question-actions a:hover {
     background: #2980b9;
     transform: translateY(-2px);
