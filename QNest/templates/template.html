@@ -1,45 +1,47 @@
-{% extends 'base.html' %}
-{% load static %}
+{% extends 'base.html' %} {% load static %} {% block title %}Templates{%endblock %} {% block content %}
+<div class="template-container">
+  <h2>Your Templates</h2>
 
-{% block title %}Templates{% endblock %}
+  {% if templates %}
+  <div class="template-grid">
+    {% for template in templates %}
+    <div class="template-card">
+      <h3>{{ template.template_name }}</h3>
+      <p><strong>Exam Title:</strong> {{ template.exam_title }}</p>
+      <p><strong>Course Code:</strong> {{ template.course_code }}</p>
+      <p><strong>Course Name:</strong> {{ template.course_name }}</p>
+      <p><strong>Time Duration:</strong> {{ template.time_duration }}</p>
+      <p><strong>Max Marks:</strong> {{ template.max_marks }}</p>
+      <p>
+        <strong>Created At:</strong> {{ template.created_at|date:"d M Y, H:i" }}
+      </p>
 
-{% block content %}
-<h2>Your Templates</h2>
-
-{% if templates %}
-    <div style="display: flex; flex-wrap: wrap; gap: 16px;">
-        {% for template in templates %}
-            <div style="width: 300px; border: 1px solid #ccc; border-radius: 8px; padding: 16px; box-shadow: 2px 2px 8px rgba(0,0,0,0.1);">
-                <h3>{{ template.template_name }}</h3>
-                <p><strong>Exam Title:</strong> {{ template.exam_title }}</p>
-                <p><strong>Course Code:</strong> {{ template.course_code }}</p>
-                <p><strong>Course Name:</strong> {{ template.course_name }}</p>
-                <p><strong>Time Duration:</strong> {{ template.time_duration }}</p>
-                <p><strong>Max Marks:</strong> {{ template.max_marks }}</p>
-                <p><strong>Created At:</strong> {{ template.created_at|date:"d M Y, H:i" }}</p>
-                
-                {% if template.sections %}
-                    <details>
-                        <summary><strong>View Sections</strong></summary>
-                        {% for section in template.sections %}
-                            <div style="margin-top: 10px;">
-                                <p><strong>Section {{ section.section_name }}:</strong></p>
-                                <p>Total Questions: {{ section.total_questions }}</p>
-                                <p>Questions to Answer: {{ section.counted_questions }}</p>
-                                <p>Marks per Question: {{ section.marks_per_question }}</p>
-                                <p>Section Marks: {{ section.section_marks }}</p>
-                                <p>Instructions: {{ section.instructions }}</p>
-                            </div>
-                            {% if not forloop.last %}<hr>{% endif %}
-                        {% endfor %}
-                    </details>
-                {% else %}
-                    <p>No sections available.</p>
-                {% endif %}
-            </div>
-        {% endfor %}
+      {% if template.sections %}
+      <details class="section-details">
+        <summary><strong>View Sections</strong></summary>
+        {% for section in template.sections %}
+        <div class="section-item">
+          <p><strong>Section {{ section.section_name }}:</strong></p>
+          <p>Total Questions: {{ section.total_questions }}</p>
+          <p>Questions to Answer: {{ section.counted_questions }}</p>
+          <p>Marks per Question: {{ section.marks_per_question }}</p>
+          <p>Section Marks: {{ section.section_marks }}</p>
+          <p>Instructions: {{ section.instructions }}</p>
+        </div>
+        {% if not forloop.last %}
+        <hr />
+        {% endif %} {% endfor %}
+      </details>
+      {% else %}
+      <p>No sections available.</p>
+      {% endif %}
     </div>
-{% else %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="no-templates">
     <p>No templates available. Please create one!</p>
-{% endif %}
+  </div>
+  {% endif %}
+</div>
 {% endblock %}
