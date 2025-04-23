@@ -15,6 +15,7 @@ urlpatterns = [
     path('mcq/', mcq, name='mcq'),
     path('download-pdf/', download_generated_pdf, name='download_generated_pdf'),
     path("generated-papers/", view_generated_pdfs, name="view_generated_pdfs"),
+    # path('download-mcq-pdf/', views.download_mcq_pdf, name='download_mcq_pdf'),
 
 ]
 

@@ -25,6 +25,7 @@ from django.core.files.base import ContentFile
 from datetime import datetime
 from django.utils.html import escape
 import re
+from django.template import Template as DjangoTemplate
 # from django.utils.html import unescape_html
 
 # from django.utils.http import urlquote
@@ -603,7 +604,6 @@ def template_view(request):
 def view_generated_pdfs(request):
     generated_pdfs = GeneratedPDF.objects.filter(user=request.user).order_by("-created_at")
     return render(request, "question.html", {"generated_pdfs": generated_pdfs})
-
 
 @login_required
 def mcq(request):
